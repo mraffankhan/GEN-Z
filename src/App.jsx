@@ -19,9 +19,6 @@ import SignupScreen from './pages/auth/SignupScreen'
 import ForgotPassword from './pages/auth/ForgotPassword'
 import ResetPassword from './pages/auth/ResetPassword'
 import Logout from './pages/auth/Logout'
-import OtpLogin from './pages/auth/OtpLogin'
-import OtpVerify from './pages/auth/OtpVerify'
-import GateScreen from './pages/auth/GateScreen'
 import RequireAuth from './components/auth/RequireAuth'
 
 function App() {
@@ -29,12 +26,7 @@ function App() {
     <UserProvider>
       <Router>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/auth/gate" element={<GateScreen />} />
-          <Route path="/auth/otp-login" element={<OtpLogin />} />
-          <Route path="/auth/otp-verify" element={<OtpVerify />} />
-
-          {/* Legacy/Alternative Auth */}
+          {/* Auth Routes */}
           <Route path="/auth/login" element={<LoginScreen />} />
           <Route path="/auth/signup" element={<SignupScreen />} />
           <Route path="/auth/forgot" element={<ForgotPassword />} />

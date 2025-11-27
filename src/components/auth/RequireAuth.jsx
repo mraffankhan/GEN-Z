@@ -15,8 +15,8 @@ const RequireAuth = ({ children }) => {
     }
 
     if (!session) {
-        // Redirect to gate, saving the current location they were trying to go to
-        return <Navigate to="/auth/gate" state={{ from: location }} replace />
+        // Redirect to login, saving the current location they were trying to go to
+        return <Navigate to="/auth/login" state={{ from: location }} replace />
     }
 
     return children
