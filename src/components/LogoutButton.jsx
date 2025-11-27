@@ -12,7 +12,7 @@ const LogoutButton = () => {
 
         try {
             await supabase.auth.signOut()
-            navigate('/auth/otp-login')
+            navigate('/auth/login')
         } catch (error) {
             console.error('Logout failed:', error)
             alert('Failed to logout. Please try again.')
