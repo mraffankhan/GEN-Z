@@ -58,16 +58,16 @@ const QuickDM = ({ isOpen, onClose }) => {
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-dark-bg w-full max-w-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
 
                 {/* Header */}
-                <div className="bg-white/5 p-4 flex justify-between items-center border-b border-white/10">
+                <div className="bg-gray-50 p-4 flex justify-between items-center border-b border-gray-100">
                     <div className="flex items-center gap-2">
                         <MessageSquare className="text-neon-green w-5 h-5" />
-                        <h3 className="font-bold text-white">Quick DM</h3>
+                        <h3 className="font-bold text-gray-900">Quick DM</h3>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -75,18 +75,18 @@ const QuickDM = ({ isOpen, onClose }) => {
                 {/* Body */}
                 <div className="p-6">
                     <div className="mb-4">
-                        <p className="text-sm text-gray-400 mb-2">To: <span className="text-neon-green">@campus_crush</span></p>
+                        <p className="text-sm text-gray-500 mb-2">To: <span className="text-neon-green font-bold">@campus_crush</span></p>
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="Type a message..."
-                            className="w-full bg-black/50 text-white p-4 rounded-xl border border-white/10 focus:border-neon-green focus:outline-none resize-none h-32"
+                            className="w-full bg-gray-50 text-gray-900 p-4 rounded-xl border border-gray-200 focus:border-neon-green focus:outline-none resize-none h-32"
                             autoFocus
                         />
                     </div>
 
                     {error && (
-                        <div className="mb-4 p-4 bg-red-900/20 border border-red-500/50 rounded-xl flex items-start gap-3 text-red-400 text-sm">
+                        <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 text-sm">
                             <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
                                 <p className="font-bold">Message Blocked</p>
@@ -98,7 +98,7 @@ const QuickDM = ({ isOpen, onClose }) => {
                     <button
                         onClick={handleSend}
                         disabled={isChecking || !message.trim()}
-                        className="w-full bg-neon-green text-black py-3 rounded-xl font-bold hover:bg-green-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-neon-green text-white py-3 rounded-xl font-bold hover:bg-green-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-200"
                     >
                         {isChecking ? 'Analyzing Safety...' : <><Send className="w-5 h-5" /> Send Message</>}
                     </button>

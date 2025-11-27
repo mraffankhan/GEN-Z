@@ -57,12 +57,12 @@ const PollsWidget = ({ status }) => {
 
     if (isLockedCompletely) {
         return (
-            <div className="w-full max-w-md mt-8 bg-card-bg p-6 rounded-2xl border border-white/5 relative overflow-hidden backdrop-blur-sm">
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-10">
+            <div className="w-full max-w-md mt-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
                     <div className="text-center flex flex-col items-center">
-                        <BarChart2 className="text-gray-600 w-10 h-10 mb-3" />
-                        <p className="text-gray-400 font-bold text-lg">Polls Locked</p>
-                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                        <BarChart2 className="text-gray-400 w-10 h-10 mb-3" />
+                        <p className="text-gray-600 font-bold text-lg">Polls Locked</p>
+                        <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
                             <Lock className="w-3 h-3" /> Verify to unlock
                         </p>
                     </div>
@@ -70,21 +70,21 @@ const PollsWidget = ({ status }) => {
                 {/* Blurred Content Behind */}
                 <h2 className="text-xl font-cyber text-neon-green mb-4 opacity-20">Daily Poll</h2>
                 <div className="space-y-3 opacity-20">
-                    <div className="h-12 bg-gray-800 rounded-xl"></div>
-                    <div className="h-12 bg-gray-800 rounded-xl"></div>
+                    <div className="h-12 bg-gray-100 rounded-xl"></div>
+                    <div className="h-12 bg-gray-100 rounded-xl"></div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="w-full max-w-md mt-8 bg-card-bg p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+        <div className="w-full max-w-md mt-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
                 <BarChart2 className="text-neon-green w-6 h-6" />
                 <h2 className="text-xl font-cyber text-neon-green tracking-tight">Daily Poll</h2>
             </div>
 
-            <p className={`mb-6 font-bold text-lg ${isSafe ? 'text-white' : 'text-red-500 flex items-center gap-2'}`}>
+            <p className={`mb-6 font-bold text-lg ${isSafe ? 'text-gray-900' : 'text-red-500 flex items-center gap-2'}`}>
                 {!isSafe && <ShieldAlert className="w-5 h-5" />}
                 {pollQuestion}
             </p>
@@ -98,8 +98,8 @@ const PollsWidget = ({ status }) => {
                             disabled={!canVote || isRestricted}
                             className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center
                 ${canVote && !isRestricted
-                                    ? 'border-white/10 hover:border-neon-green hover:bg-white/5 text-gray-200'
-                                    : 'border-white/5 text-gray-600 cursor-not-allowed'
+                                    ? 'border-gray-100 hover:border-neon-green hover:bg-neon-green/5 text-gray-700'
+                                    : 'border-gray-100 text-gray-400 cursor-not-allowed bg-gray-50'
                                 }`}
                         >
                             {option}
@@ -110,7 +110,7 @@ const PollsWidget = ({ status }) => {
             )}
 
             {!canVote && (
-                <div className="text-center mt-4 text-xs text-yellow-500/80 flex items-center justify-center gap-2 bg-yellow-900/10 p-2 rounded-lg border border-yellow-500/20">
+                <div className="text-center mt-4 text-xs text-yellow-600 flex items-center justify-center gap-2 bg-yellow-50 p-2 rounded-lg border border-yellow-100">
                     <Lock className="w-3 h-3" />
                     Voting is locked while verification is pending.
                 </div>

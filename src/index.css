@@ -1,4 +1,4 @@
-```css @import "tailwindcss";
+@import "tailwindcss";
 
 @theme {
   --color-bg: #FFFFFF;
@@ -16,5 +16,3 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-cyber);
 }
-
-```

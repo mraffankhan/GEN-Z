@@ -1,4 +1,3 @@
-```
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { Home, MessageSquare, BarChart2, Zap, User } from 'lucide-react'
@@ -19,9 +18,8 @@ const BottomNav = () => {
                         key={path}
                         to={path}
                         className={({ isActive }) =>
-                            `flex flex - col items - center gap - 1 transition - colors ${
-    isActive ? 'text-neon-purple' : 'text-gray-400 hover:text-gray-600'
-} `
+                            `flex flex-col items-center gap-1 transition-colors ${isActive ? 'text-neon-purple' : 'text-gray-400 hover:text-gray-600'
+                            }`
                         }
                     >
                         <Icon className="w-6 h-6" />
@@ -34,4 +32,3 @@ const BottomNav = () => {
 }
 
 export default BottomNav
-```

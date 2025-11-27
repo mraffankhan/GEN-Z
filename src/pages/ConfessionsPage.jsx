@@ -11,7 +11,7 @@ const ConfessionsPage = () => {
     }, [])
 
     return (
-        <div className="min-h-screen bg-dark-bg text-white pb-24 p-4">
+        <div className="min-h-screen bg-gray-50 text-gray-900 pb-24 p-4">
             <div className="max-w-md mx-auto">
                 <h1 className="text-2xl font-cyber text-neon-purple mb-6">Confessions</h1>
                 <ConfessionsFeed status={status} />
