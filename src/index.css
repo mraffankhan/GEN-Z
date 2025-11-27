@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-green: #42FF93;
+  --color-neon-purple: #B04BFF;
+  --color-dark-bg: #000000;
+  --color-card-bg: rgba(255, 255, 255, 0.05);
+  --font-cyber: "Inter", "Poppins", sans-serif;
+}
+
+body {
+  background-color: var(--color-dark-bg);
+  color: #ffffff;
+  font-family: var(--font-cyber);
+}
