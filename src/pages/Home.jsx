@@ -29,8 +29,8 @@ const Home = () => {
       {/* Top Bar */}
       <div className="px-6 py-6 flex justify-between items-center bg-white/80 sticky top-0 z-40 backdrop-blur-md border-b border-gray-100">
         <div>
-          <h1 className="text-xl font-cyber text-gray-900 tracking-wide">CAMPUS<span className="text-neon-purple">CONNECT</span></h1>
-          <p className="text-xs text-gray-500 font-mono">MIT-WPU EDITION</p>
+          <h1 className="text-xl font-cyber text-gray-900 tracking-wide">GEN-Z<span className="text-neon-purple">CONNECT</span></h1>
+          <p className="text-xs text-gray-500 font-mono">GEN-Z EDITION</p>
         </div>
         <div className="flex items-center gap-4">
           <button className="relative text-gray-400 hover:text-gray-600 transition-colors">
