@@ -1,50 +1,81 @@
 import React, { useState, useEffect } from 'react'
-import { MessageSquare, Lock, Flame, Plus, Send, ShieldAlert } from 'lucide-react'
+import { MessageSquare, Lock, Plus, Send, ShieldAlert, User, Tag as TagIcon } from 'lucide-react'
 import { checkTextSafety } from '../lib/moderation/geminiTextCheck'
 import { updateTrustScore, TRUST_ACTIONS } from '../lib/trust/updateTrustScore'
 import { supabase } from '../lib/supabase'
+import { useUser } from '../context/UserContext'
+import { Link } from 'react-router-dom'
 
-const ConfessionsFeed = ({ status }) => {
-    const isApproved = status === 'approved'
+const ConfessionsFeed = () => {
+    const { user, profile } = useUser()
+    const isApproved = profile?.verification_status === 'approved'
     const canPost = isApproved
 
+    const [confessions, setConfessions] = useState([])
     const [newConfession, setNewConfession] = useState('')
+    const [tag, setTag] = useState('')
     const [isChecking, setIsChecking] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [showInput, setShowInput] = useState(false)
     const [trustScore, setTrustScore] = useState(500)
 
     // Fetch trust score on mount
     useEffect(() => {
-        const fetchScore = async () => {
-            try {
-                const fakeUserId = '00000000-0000-0000-0000-000000000000'
-                const { data, error } = await supabase.from('profiles').select('trust_score').eq('id', fakeUserId).single()
-
-                if (error) {
-                    console.warn("Trust score fetch failed (likely missing column), defaulting to 500:", error.message)
-                    setTrustScore(500)
-                } else if (data) {
-                    setTrustScore(data.trust_score)
-                }
-            } catch (err) {
-                console.error("Unexpected error fetching trust score:", err)
-                setTrustScore(500)
-            }
+        if (profile) {
+            setTrustScore(profile.trust_score || 500)
         }
-        fetchScore()
-    }, [])
+    }, [profile])
 
     const isRestricted = trustScore < 300
 
-    const mockConfessions = [
-        { id: 1, content: "I actually miss 8am classes... said no one ever.", time: "2h ago", likes: 45 },
-        { id: 2, content: "The coffee machine in the library is my only friend during finals.", time: "4h ago", likes: 120 },
-        { id: 3, content: "Why is the wifi always down when I have a deadline?", time: "5h ago", likes: 89 },
-    ]
+    // Fetch confessions from database
+    useEffect(() => {
+        fetchConfessions()
+
+        // Setup real-time subscription
+        const channel = supabase
+            .channel('confessions')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'confessions' },
+                (payload) => {
+                    console.log('New confession:', payload.new)
+                    // Add new confession to top of list
+                    setConfessions(prev => [payload.new, ...prev])
+                }
+            )
+            .subscribe()
+
+        // Cleanup subscription on unmount
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [])
+
+    const fetchConfessions = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('confessions')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+
+            setConfessions(data || [])
+        } catch (error) {
+            console.error('Failed to fetch confessions:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handlePost = async () => {
-        if (!newConfession.trim()) return
+        if (!newConfession.trim() || !user) return
+        if (!isApproved) {
+            alert("You must be verified to post.")
+            return
+        }
         if (isRestricted) {
             setError("Restricted Mode: Trust Score too low.")
             return
@@ -54,20 +85,70 @@ const ConfessionsFeed = ({ status }) => {
         setError(null)
 
         const result = await checkTextSafety(newConfession)
-        const fakeUserId = '00000000-0000-0000-0000-000000000000'
 
         setIsChecking(false)
 
         if (result.safe) {
-            alert("Confession posted! (Mock)")
-            await updateTrustScore(fakeUserId, TRUST_ACTIONS.CONFESSION_UPVOTED)
+            try {
+                // Prepare confession data
+                const confessionData = {
+                    user_id: user.id,
+                    content: newConfession.trim(),
+                    created_at: new Date().toISOString()
+                }
 
-            setNewConfession('')
-            setShowInput(false)
+                // Add tag if provided
+                if (tag.trim()) {
+                    confessionData.tag = tag.trim()
+                }
+
+                // Insert into database
+                const { error: insertError } = await supabase
+                    .from('confessions')
+                    .insert(confessionData)
+
+                if (insertError) {
+                    // Fallback: Try without tag if column is missing
+                    if (insertError.code === 'PGRST204' && confessionData.tag) {
+                        console.warn("⚠️ 'tag' column missing in confessions table. Posting without tag...")
+                        delete confessionData.tag
+
+                        const { error: retryError } = await supabase
+                            .from('confessions')
+                            .insert(confessionData)
+
+                        if (retryError) throw retryError
+                    } else {
+                        throw insertError
+                    }
+                }
+
+                // Update trust score for good behavior
+                await updateTrustScore(user.id, TRUST_ACTIONS.CONFESSION_UPVOTED)
+
+                // Reset form
+                setNewConfession('')
+                setTag('')
+                setShowInput(false)
+            } catch (error) {
+                console.error('Failed to post confession:', error)
+                alert('Failed to post confession. Please try again.')
+            }
         } else {
             setError(result.reason)
-            await updateTrustScore(fakeUserId, TRUST_ACTIONS.AI_TOXIC_MESSAGE)
+            await updateTrustScore(user.id, TRUST_ACTIONS.AI_TOXIC_MESSAGE)
         }
+    }
+
+    const formatTimeAgo = (timestamp) => {
+        const now = new Date()
+        const created = new Date(timestamp)
+        const seconds = Math.floor((now - created) / 1000)
+
+        if (seconds < 60) return 'Just now'
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+        return `${Math.floor(seconds / 86400)}d ago`
     }
 
     return (
@@ -98,8 +179,16 @@ const ConfessionsFeed = ({ status }) => {
                     <textarea
                         value={newConfession}
                         onChange={(e) => setNewConfession(e.target.value)}
-                        placeholder="What's on your mind? (Anon)"
+                        placeholder="What's on your mind? (Anonymous)"
                         className="w-full bg-gray-50 text-gray-900 p-3 rounded-xl border border-gray-200 focus:border-neon-purple focus:outline-none resize-none h-24 mb-3"
+                    />
+
+                    <input
+                        type="text"
+                        value={tag}
+                        onChange={(e) => setTag(e.target.value)}
+                        placeholder="Tag (optional)"
+                        className="w-full bg-gray-50 text-gray-900 p-2 rounded-lg border border-gray-200 focus:border-neon-purple focus:outline-none mb-3 text-sm"
                     />
 
                     {error && (
@@ -121,25 +210,53 @@ const ConfessionsFeed = ({ status }) => {
                 </div>
             )}
 
-            <div className="space-y-4">
-                {mockConfessions.map(confession => (
-                    <div key={confession.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-                        <p className="text-gray-800 mb-4 text-base leading-relaxed">"{confession.content}"</p>
-                        <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
-                            <span>{confession.time}</span>
-                            <div className="flex items-center gap-1.5 text-neon-purple">
-                                <Flame className="w-4 h-4" />
-                                <span>{confession.likes}</span>
+            {/* Confessions Feed */}
+            {loading ? (
+                <div className="text-center text-gray-400 py-8">Loading confessions...</div>
+            ) : confessions.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>No confessions yet. Be the first to share!</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {confessions.map(confession => (
+                        <div
+                            key={confession.id}
+                            className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all animate-in fade-in slide-in-from-top-2"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <User className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <span className="text-sm font-bold text-gray-900">Anonymous</span>
+                                {confession.tag && (
+                                    <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-neon-purple bg-opacity-10 text-neon-purple text-xs font-bold">
+                                        <TagIcon className="w-3 h-3" />
+                                        {confession.tag}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            <p className="text-gray-800 mb-3 text-base leading-relaxed">"{confession.content}"</p>
+
+                            {/* Footer */}
+                            <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
+                                <span>{formatTimeAgo(confession.created_at)}</span>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {!isApproved && (
                 <div className="text-center mt-6 text-sm text-gray-500 flex items-center justify-center gap-2">
                     <Lock className="w-4 h-4 text-neon-purple" />
-                    <span><span className="text-neon-purple font-bold">Verify your ID</span> to post anonymously.</span>
+                    <span>
+                        <Link to="/verify/upload" className="text-neon-purple font-bold hover:underline">Verify your ID</Link> to post anonymously.
+                    </span>
                 </div>
             )}
         </div>

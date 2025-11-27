@@ -3,10 +3,12 @@ import { BarChart2, Lock, ShieldAlert } from 'lucide-react'
 import { checkTextSafety } from '../lib/moderation/geminiTextCheck'
 import { updateTrustScore, TRUST_ACTIONS } from '../lib/trust/updateTrustScore'
 import { supabase } from '../lib/supabase'
+import { useUser } from '../context/UserContext'
+import { Link } from 'react-router-dom'
 
-const PollsWidget = ({ status }) => {
-    const isApproved = status === 'approved'
-    const isLockedCompletely = status === 'not_submitted' || status === 'rejected'
+const PollsWidget = () => {
+    const { user, profile } = useUser()
+    const isApproved = profile?.verification_status === 'approved'
     const canVote = isApproved
 
     const [pollQuestion, setPollQuestion] = useState('Best spot to study on campus?')
@@ -23,48 +25,40 @@ const PollsWidget = ({ status }) => {
         }
         verifyPoll()
 
-        const fetchScore = async () => {
-            try {
-                const fakeUserId = '00000000-0000-0000-0000-000000000000'
-                const { data, error } = await supabase.from('profiles').select('trust_score').eq('id', fakeUserId).single()
-
-                if (error) {
-                    console.warn("Trust score fetch failed, defaulting to 500")
-                    setTrustScore(500)
-                } else if (data) {
-                    setTrustScore(data.trust_score)
-                }
-            } catch (e) {
-                setTrustScore(500)
-            }
+        if (profile) {
+            setTrustScore(profile.trust_score || 500)
         }
-        fetchScore()
-    }, [])
+    }, [profile, pollQuestion])
 
     const isRestricted = trustScore < 300
 
     const handleVote = async () => {
-        if (!canVote) return
+        if (!canVote || !user) {
+            alert("You must be verified to vote.")
+            return
+        }
         if (isRestricted) {
             alert("Restricted Mode: Cannot vote.")
             return
         }
 
-        const fakeUserId = '00000000-0000-0000-0000-000000000000'
-        await updateTrustScore(fakeUserId, TRUST_ACTIONS.POLL_VOTE)
+        await updateTrustScore(user.id, TRUST_ACTIONS.POLL_VOTE)
         alert("Voted! (+5 Trust Score)")
     }
 
-    if (isLockedCompletely) {
+    if (!isApproved) {
         return (
             <div className="w-full max-w-md mt-8 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
                 <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
                     <div className="text-center flex flex-col items-center">
                         <BarChart2 className="text-gray-400 w-10 h-10 mb-3" />
                         <p className="text-gray-600 font-bold text-lg">Polls Locked</p>
-                        <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                        <p className="text-sm text-gray-500 mt-1 flex items-center gap-1 mb-3">
                             <Lock className="w-3 h-3" /> Verify to unlock
                         </p>
+                        <Link to="/verify/upload" className="px-4 py-2 bg-neon-green text-black rounded-lg font-bold text-xs">
+                            Verify Now
+                        </Link>
                     </div>
                 </div>
                 {/* Blurred Content Behind */}
@@ -106,13 +100,6 @@ const PollsWidget = ({ status }) => {
                             {(!canVote || isRestricted) && <Lock className="w-4 h-4 opacity-50" />}
                         </button>
                     ))}
-                </div>
-            )}
-
-            {!canVote && (
-                <div className="text-center mt-4 text-xs text-yellow-600 flex items-center justify-center gap-2 bg-yellow-50 p-2 rounded-lg border border-yellow-100">
-                    <Lock className="w-3 h-3" />
-                    Voting is locked while verification is pending.
                 </div>
             )}
         </div>

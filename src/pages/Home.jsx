@@ -1,21 +1,28 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, User, MessageSquare, BarChart2, Zap, ShieldCheck, AlertTriangle } from 'lucide-react'
-import { getVerificationStatus } from '../lib/authHelpers'
+import { Bell, User, MessageSquare, BarChart2, Zap, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
 import FeatureCard from '../components/FeatureCard'
 import QuickDM from '../components/QuickDM'
+import { useUser } from '../context/UserContext'
 
 const Home = () => {
-  const [status, setStatus] = useState('pending')
+  const { profile, loading } = useUser()
   const [showQuickDM, setShowQuickDM] = useState(false)
 
-  useEffect(() => {
-    setStatus(getVerificationStatus())
-  }, [])
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
+      </div>
+    )
+  }
 
-  const isApproved = status === 'approved'
-  const isRejected = status === 'rejected'
+  // Strict Check: Default to 'not_submitted' if profile or status is missing
+  const verificationStatus = profile?.verification_status || 'not_submitted'
+  const isApproved = verificationStatus === 'approved'
+  const isRejected = verificationStatus === 'rejected'
+  const isPending = verificationStatus === 'pending' || verificationStatus === 'not_submitted'
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-24">
@@ -37,7 +44,7 @@ const Home = () => {
       </div>
 
       <div className="px-4 max-w-md mx-auto space-y-6 mt-6">
-        {/* Verification Banner */}
+        {/* Verification Banner - Shows for ANY status except approved */}
         {!isApproved && (
           <div className={`p-4 rounded-2xl border flex items-center gap-3 shadow-sm
             ${isRejected
@@ -46,24 +53,24 @@ const Home = () => {
             }`}>
             {isRejected ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <ShieldCheck className="w-6 h-6 shrink-0" />}
             <div>
-              <h3 className="font-bold text-sm">{isRejected ? 'Verification Failed' : 'Verification Pending'}</h3>
+              <h3 className="font-bold text-sm">
+                {isRejected ? 'Verification Failed' : 'Verification Required'}
+              </h3>
               <p className="text-xs opacity-80">
                 {isRejected
-                  ? 'Upload a clearer ID card to access features.'
-                  : 'You have limited access until verified.'}
+                  ? 'Your ID was not accepted. Please try again.'
+                  : 'Verify your student ID to unlock all features.'}
               </p>
-              {isRejected && (
-                <Link to="/verify/upload" className="mt-2 inline-block text-xs font-bold underline">
-                  Resubmit ID
-                </Link>
-              )}
+              <Link to="/verify/upload" className="mt-2 inline-block text-xs font-bold underline">
+                {isRejected ? 'Retry Verification' : 'Verify Now'}
+              </Link>
             </div>
           </div>
         )}
 
         {/* Welcome Section */}
         <div>
-          <h2 className="text-2xl font-bold mb-1 text-gray-900">Hey, <span className="text-neon-purple">Student</span> 👋</h2>
+          <h2 className="text-2xl font-bold mb-1 text-gray-900">Hey, <span className="text-neon-purple">{profile?.ai_name?.split(' ')[0] || 'Student'}</span> 👋</h2>
           <p className="text-gray-500 text-sm">What's happening on campus today?</p>
         </div>
 

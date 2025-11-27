@@ -1,126 +1,119 @@
-import React, { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { Shield, Star, Crown, AlertTriangle, User } from 'lucide-react'
+import React from 'react'
+import { User, Edit, ShoppingBag, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import * as Icons from 'lucide-react'
+import { useUser } from '../context/UserContext'
+import ProfileStats from '../components/ProfileStats'
+import LogoutButton from '../components/LogoutButton'
 
 const Profile = () => {
-    const [profile, setProfile] = useState(null)
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        fetchProfile()
-    }, [])
-
-    const fetchProfile = async () => {
-        const fakeUserId = '00000000-0000-0000-0000-000000000000'
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', fakeUserId)
-            .single()
-
-        if (error) {
-            console.warn("Profile fetch error:", error.message)
-            // Fallback for demo if DB is incomplete
-            setProfile({
-                trust_score: 500,
-                ai_name: 'Anonymous',
-                ai_college: 'Unknown',
-                verification_status: 'pending',
-                rewards: 0,
-                infractions: 0
-            })
-        } else if (data) {
-            setProfile(data)
-        }
-        setLoading(false)
-    }
+    const { user, profile, loading } = useUser()
 
     if (loading) return <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center">Loading Profile...</div>
     if (!profile) return <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center">Profile not found</div>
 
-    const { trust_score = 500, ai_name, ai_college, verification_status } = profile
+    const {
+        display_name,
+        trust_score = 500,
+        coins = 0,
+        verification_status,
+        active_border,
+        active_badge,
+        bio
+    } = profile
 
-    const isRestricted = trust_score < 300
-    const isGold = trust_score >= 800
-    const isOG = trust_score >= 900
+    // Helper for border styles
+    const getBorderClass = (borderName) => {
+        if (borderName === 'Gold Profile Border') return 'border-4 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]'
+        if (borderName === 'Neon Purple Border') return 'border-4 border-neon-purple shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+        return 'border-4 border-gray-200'
+    }
 
-    // Calculate percentage for progress bar (0 to 1000)
-    const scorePercent = (trust_score / 1000) * 100
+    // Helper for badge icon
+    const getBadgeIcon = (badgeName) => {
+        if (badgeName === 'OG Badge') return Icons.Crown
+        if (badgeName === 'Cyber Spark Badge') return Icons.Zap
+        return null
+    }
+    const BadgeIcon = active_badge ? getBadgeIcon(active_badge) : null
+
+    const isVerified = verification_status === 'approved'
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 p-4 pb-20">
-            <div className="max-w-md mx-auto">
-                <h1 className="text-3xl font-cyber text-neon-purple mb-8 text-center">My Profile</h1>
-
-                {/* User Card */}
-                <div className={`bg-white p-6 rounded-3xl border ${isGold ? 'border-yellow-400 shadow-lg shadow-yellow-100' : 'border-gray-100 shadow-sm'} relative overflow-hidden mb-8`}>
-                    {isOG && (
-                        <div className="absolute top-0 right-0 bg-neon-purple text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
-                            <Crown className="w-3 h-3" /> OG MEMBER
-                        </div>
-                    )}
-
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
-                            <User className="w-10 h-10 text-gray-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900">{ai_name || 'Anonymous Student'}</h2>
-                            <p className="text-gray-500 text-sm">{ai_college || 'Unknown College'}</p>
-                            <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs">
-                                <span className={`w-2 h-2 rounded-full ${verification_status === 'approved' ? 'bg-neon-green' : 'bg-gray-400'}`}></span>
-                                <span className="uppercase text-gray-600">{verification_status || 'Unverified'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Trust Score Section */}
-                    <div className="mb-2">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-gray-400 text-sm font-bold uppercase tracking-wider">Trust Score</span>
-                            <span className={`text-2xl font-cyber ${isRestricted ? 'text-red-500' : 'text-neon-green'}`}>
-                                {trust_score}
-                            </span>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="h-4 bg-gray-100 rounded-full overflow-hidden relative">
-                            <div
-                                className={`h-full transition-all duration-1000 ease-out ${isRestricted ? 'bg-red-500' : 'bg-gradient-to-r from-neon-green to-neon-purple'}`}
-                                style={{ width: `${scorePercent}%` }}
-                            ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-400 mt-1 font-mono">
-                            <span>0 (Banned)</span>
-                            <span>1000 (Legend)</span>
-                        </div>
-                    </div>
-
-                    {isRestricted && (
-                        <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600 text-sm">
-                            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-bold">Restricted Mode</p>
-                                <p>Your trust score is too low. Posting and voting are disabled.</p>
-                            </div>
-                        </div>
-                    )}
+        <div className="min-h-screen bg-white text-gray-900 p-4 pb-20">
+            <div className="max-w-md mx-auto space-y-6">
+                {/* Header */}
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-cyber text-neon-purple">My Profile</h1>
+                    <Link to="/store" className="p-2 bg-gray-50 rounded-full border border-gray-100 shadow-sm text-neon-purple">
+                        <ShoppingBag className="w-5 h-5" />
+                    </Link>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                        <div className="text-neon-purple text-2xl font-bold mb-1">{profile.rewards || 0}</div>
-                        <div className="text-gray-400 text-xs uppercase tracking-wider">Rewards</div>
+                {/* Avatar & Info Card */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <div className="flex flex-col items-center text-center mb-6">
+                        {/* Avatar */}
+                        <div className="relative mb-4">
+                            <div className={`w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden transition-all ${getBorderClass(active_border)}`}>
+                                <User className="w-12 h-12 text-gray-400" />
+                            </div>
+                            {/* Verified Badge */}
+                            {isVerified && (
+                                <div className="absolute -top-1 -right-1 bg-neon-green p-1.5 rounded-full shadow-md border-2 border-white">
+                                    <ShieldCheck className="w-4 h-4 text-white fill-current" />
+                                </div>
+                            )}
+                            {/* Active Badge */}
+                            {active_badge && BadgeIcon && (
+                                <div className="absolute -bottom-1 -right-1 bg-white p-1.5 rounded-full shadow-md border border-gray-100">
+                                    <BadgeIcon className="w-4 h-4 text-neon-purple fill-current" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Name & Email */}
+                        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                            {display_name || 'Set your name'}
+                        </h2>
+                        <p className="text-sm text-gray-500 mb-3">{user?.email}</p>
+
+                        {/* Bio */}
+                        {bio && (
+                            <p className="text-sm text-gray-600 max-w-xs">{bio}</p>
+                        )}
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                        <div className="text-red-400 text-2xl font-bold mb-1">{profile.infractions || 0}</div>
-                        <div className="text-gray-400 text-xs uppercase tracking-wider">Infractions</div>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <Link
+                            to="/profile/edit"
+                            className="py-2.5 rounded-xl bg-neon-purple text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-opacity-90 transition-colors shadow-lg shadow-purple-200"
+                        >
+                            <Edit className="w-4 h-4" />
+                            Edit Profile
+                        </Link>
+                        <Link
+                            to="/profile/customize"
+                            className="py-2.5 rounded-xl bg-gray-900 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-neon-purple transition-colors"
+                        >
+                            <ShoppingBag className="w-4 h-4" />
+                            Customize
+                        </Link>
                     </div>
                 </div>
 
-                <Link to="/" className="block w-full bg-gray-100 hover:bg-gray-200 text-center py-3 rounded-xl text-gray-900 font-bold transition-colors">
+                {/* Stats */}
+                <ProfileStats trustScore={trust_score} coins={coins} />
+
+                {/* Logout Button */}
+                <LogoutButton />
+
+                {/* Back to Home */}
+                <Link
+                    to="/"
+                    className="block w-full bg-gray-50 hover:bg-gray-100 text-center py-3 rounded-xl text-gray-900 font-bold transition-colors border border-gray-100"
+                >
                     Back to Home
                 </Link>
             </div>

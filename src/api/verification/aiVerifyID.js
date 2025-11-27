@@ -1,108 +1,138 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase } from "../../lib/supabase";
 
-// Initialize Gemini
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY);
+const MODEL_NAME = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL_ENDPOINT = `https://generativelanguage.googleapis.com/v1/models/${MODEL_NAME}:generateContent`;
 
 /**
- * Verifies an ID card image using Gemini Vision.
+ * Verifies an ID card image using Gemini Vision via direct REST API.
  * @param {string} userId - The user's ID.
- * @param {string} imageUrl - The public URL of the uploaded ID image.
+ * @param {string} base64Image - The base64 encoded image string.
+ * @param {string} mimeType - The mime type of the image.
  */
-export const verifyIDWithGemini = async (userId, imageUrl) => {
-    console.log("🤖 Starting AI Verification for:", userId);
+export const verifyIDWithGemini = async (userId, base64Image, mimeType = "image/jpeg") => {
+    console.log("🤖 Starting Privacy-First AI Verification for:", userId);
+
+    if (!API_KEY) {
+        console.error("❌ API Key missing");
+        return { success: false, error: "API Key missing" };
+    }
 
     try {
-        // 1. Fetch the image
-        const imageResp = await fetch(imageUrl);
-        const imageBlob = await imageResp.blob();
-        const base64Image = await blobToBase64(imageBlob);
+        // 1. Prepare Request Body
+        const requestBody = {
+            contents: [{
+                parts: [
+                    {
+                        text: `You are an ID verification system for college students. Analyze this image.
+Determine if it is a valid Student ID card.
 
-        // 2. Prepare Gemini Request
-        // Use gemini-1.5-flash for speed and vision capabilities
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+Strictly check for:
+- Presence of a photo
+- Student details (Name, Course, etc.) - DO NOT EXTRACT THEM, just check they exist.
+- College/University branding.
+- Validity (not expired).
 
-        const prompt = `
-      You are an ID verification system for college students in India. Analyze this ID card image. 
-      Determine if it is real or fake.  
-      Extract: student name, college name, department, year.  
-      If the card seems edited, blurred, photoshopped, or a screenshot, mark it unsafe.
-      
-      Return ONLY a JSON object with this exact structure:
-      {
-        "real": true, 
-        "score": 85, 
-        "name": "Extracted Name", 
-        "college": "Extracted College", 
-        "issues": ["List of issues if any"]
-      }
-      
-      Rules:
-      - Score 0-100 (100 is perfect real ID).
-      - If "real" is false, score should be < 50.
-      - If text is blurry or unreadable, mention it in issues.
-      - Do not include Markdown formatting (no \`\`\`json).
-    `;
+Return ONLY a JSON object with this exact structure:
+{
+  "is_student": true,
+  "confidence": 85,
+  "reason": "Clear ID card with visible student details and college logo."
+}
 
-        const imagePart = {
-            inlineData: {
-                data: base64Image,
-                mimeType: imageBlob.type || "image/jpeg",
-            },
+Rules:
+- "is_student": true ONLY if it looks like a real physical ID card.
+- "confidence": 0-100.
+- "reason": Short explanation.
+- Do not include Markdown formatting (no \`\`\`json).` },
+                    {
+                        inline_data: {
+                            mime_type: mimeType,
+                            data: base64Image
+                        }
+                    }
+                ]
+            }],
+            // generationConfig: {
+            //     response_mime_type: "application/json"
+            // }
         };
 
-        // 3. Call Gemini
-        const result = await model.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        const text = response.text();
+        // 2. Call Gemini API via fetch
+        const response = await fetch(`${MODEL_ENDPOINT}?key=${API_KEY}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestBody)
+        });
 
-        console.log("🤖 Gemini Raw Response:", text);
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("❌ Gemini API Error:", errorData);
+            throw new Error(errorData.error?.message || "Gemini API request failed");
+        }
 
-        // 4. Parse JSON
-        const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const analysis = JSON.parse(cleanJson);
+        const data = await response.json();
+        console.log("🤖 Gemini Raw Response:", data);
+
+        // 3. Parse Response
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error("No response text from Gemini");
+
+        let analysis;
+        try {
+            analysis = JSON.parse(text);
+        } catch (e) {
+            // Fallback cleanup if markdown is present despite instructions
+            const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            analysis = JSON.parse(cleanJson);
+        }
 
         console.log("🤖 Parsed Analysis:", analysis);
 
-        // 5. Determine Status
-        // Threshold: Score > 70 and Real = true
-        const isApproved = analysis.real && analysis.score > 70;
+        // 4. Determine Status
+        const isApproved = analysis.is_student === true && analysis.confidence > 60;
         const newStatus = isApproved ? 'approved' : 'rejected';
 
-        // 6. Update Supabase
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                verification_status: newStatus,
-                ai_score: analysis.score,
-                ai_name: analysis.name,
-                ai_college: analysis.college,
-                ai_issues: analysis.issues
-            })
-            .eq('id', userId);
+        console.log(`🤖 Verification Status: ${newStatus}`);
 
-        if (error) throw error;
+        // 5. Update Supabase (ONLY Status, NO PII)
+        const updateData = {
+            verification_status: newStatus,
+        };
+
+        if (isApproved) {
+            updateData.verified_at = new Date().toISOString();
+        }
+
+        // Try update with fallback for missing column
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update(updateData)
+                .eq('id', userId);
+
+            if (error) throw error;
+        } catch (err) {
+            if (err.code === 'PGRST204' && updateData.verified_at) {
+                console.warn("⚠️ 'verified_at' column missing. Retrying with only status...");
+                delete updateData.verified_at;
+                const { error: retryError } = await supabase
+                    .from('profiles')
+                    .update(updateData)
+                    .eq('id', userId);
+
+                if (retryError) throw retryError;
+            } else {
+                throw err;
+            }
+        }
 
         return { success: true, status: newStatus, analysis };
 
     } catch (error) {
         console.error("❌ AI Verification Failed:", error);
-        // Fallback: Set to pending if AI crashes, so manual review can happen (or reject if strict)
-        // For this MVP, we'll leave it as is or set to pending.
         return { success: false, error: error.message };
     }
 };
-
-// Helper to convert Blob to Base64
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result.split(',')[1]; // Remove data:image/jpeg;base64,
-            resolve(base64String);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
