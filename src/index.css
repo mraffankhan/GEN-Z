@@ -1,15 +1,20 @@
-@import "tailwindcss";
+```css @import "tailwindcss";
 
 @theme {
-  --color-neon-green: #42FF93;
-  --color-neon-purple: #B04BFF;
-  --color-dark-bg: #000000;
-  --color-card-bg: rgba(255, 255, 255, 0.05);
+  --color-bg: #FFFFFF;
+  --color-card-bg: #F8F8F8;
+  --color-text-primary: #111111;
+  --color-text-secondary: #555555;
+  --color-neon-purple: #A855F7;
+  --color-neon-green: #10FF84;
   --font-cyber: "Inter", "Poppins", sans-serif;
+  /* Keep font if not explicitly removed */
 }
 
 body {
-  background-color: var(--color-dark-bg);
-  color: #ffffff;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
   font-family: var(--font-cyber);
 }
+
+```
