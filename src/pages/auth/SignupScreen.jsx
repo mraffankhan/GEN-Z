@@ -32,6 +32,7 @@ const SignupScreen = () => {
 
         if (error) {
             setMessage({ type: 'error', text: error.message })
+            setLoading(false)
         } else {
             // Create profile immediately if user was created
             if (data?.user) {
@@ -50,9 +51,9 @@ const SignupScreen = () => {
                     console.error('Profile creation failed:', profileError)
                 }
             }
-            setMessage({ type: 'success', text: 'Account created! Check your email to verify.' })
+            // Redirect to home immediately (no email verification needed)
+            navigate('/')
         }
-        setLoading(false)
     }
 
     return (
