@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { MessageSquare, Lock, Flame, Plus, Send, ShieldAlert } from 'lucide-react'
 import { checkTextSafety } from '../lib/moderation/geminiTextCheck'
+import { updateTrustScore, TRUST_ACTIONS } from '../lib/trust/updateTrustScore'
+import { supabase } from '../lib/supabase'
 
 const ConfessionsFeed = ({ status }) => {
     const isApproved = status === 'approved'
@@ -10,6 +12,30 @@ const ConfessionsFeed = ({ status }) => {
     const [isChecking, setIsChecking] = useState(false)
     const [error, setError] = useState(null)
     const [showInput, setShowInput] = useState(false)
+    const [trustScore, setTrustScore] = useState(500)
+
+    // Fetch trust score on mount
+    useEffect(() => {
+        const fetchScore = async () => {
+            try {
+                const fakeUserId = '00000000-0000-0000-0000-000000000000'
+                const { data, error } = await supabase.from('profiles').select('trust_score').eq('id', fakeUserId).single()
+
+                if (error) {
+                    console.warn("Trust score fetch failed (likely missing column), defaulting to 500:", error.message)
+                    setTrustScore(500)
+                } else if (data) {
+                    setTrustScore(data.trust_score)
+                }
+            } catch (err) {
+                console.error("Unexpected error fetching trust score:", err)
+                setTrustScore(500)
+            }
+        }
+        fetchScore()
+    }, [])
+
+    const isRestricted = trustScore < 300
 
     const mockConfessions = [
         { id: 1, content: "I actually miss 8am classes... said no one ever.", time: "2h ago", likes: 45 },
@@ -19,20 +45,28 @@ const ConfessionsFeed = ({ status }) => {
 
     const handlePost = async () => {
         if (!newConfession.trim()) return
+        if (isRestricted) {
+            setError("Restricted Mode: Trust Score too low.")
+            return
+        }
 
         setIsChecking(true)
         setError(null)
 
         const result = await checkTextSafety(newConfession)
+        const fakeUserId = '00000000-0000-0000-0000-000000000000'
 
         setIsChecking(false)
 
         if (result.safe) {
             alert("Confession posted! (Mock)")
+            await updateTrustScore(fakeUserId, TRUST_ACTIONS.CONFESSION_UPVOTED)
+
             setNewConfession('')
             setShowInput(false)
         } else {
             setError(result.reason)
+            await updateTrustScore(fakeUserId, TRUST_ACTIONS.AI_TOXIC_MESSAGE)
         }
     }
 

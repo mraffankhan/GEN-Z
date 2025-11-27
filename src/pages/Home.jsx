@@ -1,135 +1,124 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import ConfessionsFeed from '../components/ConfessionsFeed'
-import PollsWidget from '../components/PollsWidget'
+import { Bell, User, MessageSquare, BarChart2, Zap, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { getVerificationStatus } from '../lib/authHelpers'
+import BottomNav from '../components/BottomNav'
+import FeatureCard from '../components/FeatureCard'
 import QuickDM from '../components/QuickDM'
-import { AlertTriangle, XCircle, CheckCircle, Info, Lock, MessageSquare } from 'lucide-react'
 
 const Home = () => {
-  const [status, setStatus] = useState('loading')
-  const [loading, setLoading] = useState(true)
-  const [isDMOpen, setIsDMOpen] = useState(false)
+  const [status, setStatus] = useState('pending')
+  const [showQuickDM, setShowQuickDM] = useState(false)
 
   useEffect(() => {
-    checkStatus()
+    setStatus(getVerificationStatus())
   }, [])
 
-  const checkStatus = async () => {
-    // Fake User ID for MVP testing
-    const fakeUserId = '00000000-0000-0000-0000-000000000000'
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('verification_status')
-      .eq('id', fakeUserId)
-      .single()
-
-    if (data) {
-      setStatus(data.verification_status || 'not_submitted')
-    } else {
-      setStatus('not_submitted')
-    }
-    setLoading(false)
-  }
-
-  if (loading) return <div className="min-h-screen bg-dark-bg text-white flex items-center justify-center">Loading...</div>
+  const isApproved = status === 'approved'
+  const isRejected = status === 'rejected'
 
   return (
-    <div className="min-h-screen bg-dark-bg text-white pb-20">
-
-      {/* Status Banners */}
-      {status === 'not_submitted' && (
-        <div className="w-full bg-blue-900/20 border-b border-blue-500/50 p-4 flex items-center justify-center gap-3 backdrop-blur-md">
-          <Info className="text-blue-400 w-5 h-5" />
-          <p className="text-blue-400 text-sm font-bold tracking-wider">
-            Verify your student identity to unlock full access.
-          </p>
+    <div className="min-h-screen bg-dark-bg text-white pb-24">
+      {/* Top Bar */}
+      <div className="px-6 py-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent sticky top-0 z-40 backdrop-blur-sm">
+        <div>
+          <h1 className="text-xl font-cyber text-white tracking-wide">CAMPUS<span className="text-neon-green">CONNECT</span></h1>
+          <p className="text-xs text-gray-400 font-mono">MIT-WPU EDITION</p>
         </div>
-      )}
-
-      {status === 'pending' && (
-        <div className="w-full bg-yellow-900/20 border-b border-yellow-500/50 p-4 flex items-center justify-center gap-3 backdrop-blur-md">
-          <AlertTriangle className="text-yellow-400 w-5 h-5" />
-          <p className="text-yellow-400 text-sm font-bold tracking-wider">
-            VERIFICATION PENDING — Some features locked
-          </p>
+        <div className="flex items-center gap-4">
+          <button className="relative text-gray-400 hover:text-white transition-colors">
+            <Bell className="w-6 h-6" />
+            <span className="absolute top-0 right-0 w-2 h-2 bg-neon-purple rounded-full"></span>
+          </button>
+          <Link to="/profile" className="w-10 h-10 rounded-full bg-gray-800 border border-white/20 flex items-center justify-center overflow-hidden">
+            <User className="w-6 h-6 text-gray-400" />
+          </Link>
         </div>
-      )}
-
-      {status === 'rejected' && (
-        <div className="w-full bg-red-900/20 border-b border-red-500/50 p-4 flex items-center justify-center gap-3 backdrop-blur-md">
-          <XCircle className="text-red-400 w-5 h-5" />
-          <p className="text-red-400 text-sm font-bold tracking-wider">
-            Verification Failed — Upload a clearer ID card
-          </p>
-        </div>
-      )}
-
-      {status === 'approved' && (
-        <div className="w-full bg-green-900/20 border-b border-green-500/50 p-4 flex items-center justify-center gap-3 backdrop-blur-md">
-          <CheckCircle className="text-neon-green w-5 h-5" />
-          <p className="text-neon-green text-sm font-bold tracking-wider">
-            VERIFIED STUDENT — FULL ACCESS GRANTED
-          </p>
-        </div>
-      )}
-
-      <div className="p-4 flex flex-col items-center">
-        <h1 className="text-4xl font-cyber text-neon-green mb-2 mt-4 tracking-tight">Gen-Z Social</h1>
-        <p className="text-gray-400 mb-8 text-center max-w-md text-sm font-medium">
-          The exclusive network for verified college students.
-        </p>
-
-        {(status === 'not_submitted' || status === 'rejected') && (
-          <div className="bg-card-bg p-8 rounded-2xl border border-white/10 text-center max-w-sm mb-8 backdrop-blur-xl shadow-2xl">
-            <div className="flex justify-center mb-4">
-              <Lock className="text-gray-500 w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold mb-2 text-white">Access Restricted</h2>
-            <p className="text-gray-400 mb-6 text-sm leading-relaxed">
-              You are not verified yet. Join the waitlist or verify your college ID to get full access.
-            </p>
-            <Link
-              to="/verify/start"
-              className="inline-flex items-center justify-center w-full bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-neon-green transition-all duration-300 transform hover:scale-[1.02] shadow-[0_0_20px_rgba(66,255,147,0.3)]"
-            >
-              {status === 'rejected' ? 'TRY AGAIN' : 'VERIFY NOW'}
-            </Link>
-          </div>
-        )}
-
-        {(status === 'pending' || status === 'approved') && (
-          <div className="text-gray-500 text-sm font-medium flex items-center gap-2">
-            {status === 'approved' ? (
-              <>
-                <CheckCircle className="w-4 h-4 text-neon-green" />
-                <span className="text-neon-green">Welcome to the inner circle.</span>
-              </>
-            ) : (
-              'Feel free to browse while we check your ID.'
-            )}
-          </div>
-        )}
-
-        {/* Feature Widgets */}
-        <PollsWidget status={status} />
-        <ConfessionsFeed status={status} />
-
       </div>
 
-      {/* Floating DM Button */}
-      {status === 'approved' && (
-        <>
+      <div className="px-4 max-w-md mx-auto space-y-6">
+        {/* Verification Banner */}
+        {!isApproved && (
+          <div className={`p-4 rounded-2xl border backdrop-blur-md flex items-center gap-3 shadow-lg
+            ${isRejected
+              ? 'bg-red-900/20 border-red-500/50 text-red-200'
+              : 'bg-yellow-900/20 border-yellow-500/50 text-yellow-200'
+            }`}>
+            {isRejected ? <AlertTriangle className="w-6 h-6 shrink-0" /> : <ShieldCheck className="w-6 h-6 shrink-0" />}
+            <div>
+              <h3 className="font-bold text-sm">{isRejected ? 'Verification Failed' : 'Verification Pending'}</h3>
+              <p className="text-xs opacity-80">
+                {isRejected
+                  ? 'Upload a clearer ID card to access features.'
+                  : 'You have limited access until verified.'}
+              </p>
+              {isRejected && (
+                <Link to="/verify/upload" className="mt-2 inline-block text-xs font-bold underline">
+                  Resubmit ID
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Welcome Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-1">Hey, <span className="text-neon-green">Student</span> 👋</h2>
+          <p className="text-gray-400 text-sm">What's happening on campus today?</p>
+        </div>
+
+        {/* Feature Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <FeatureCard
+            to="/confessions"
+            icon={MessageSquare}
+            title="Confessions"
+            description="Anon campus secrets"
+            color="neon-purple"
+          />
+          <FeatureCard
+            to="/polls"
+            icon={BarChart2}
+            title="Daily Polls"
+            description="Vote on hot topics"
+            color="neon-green"
+          />
+          <FeatureCard
+            to="/flashchat"
+            icon={Zap}
+            title="Flash Chat"
+            description="Instant random chat"
+            color="neon-purple"
+          />
+          <FeatureCard
+            to="/dms"
+            icon={MessageSquare}
+            title="DMs"
+            description="Chat with peers"
+            color="neon-green"
+          />
+        </div>
+
+        {/* Quick Actions */}
+        <div className="pt-4">
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Quick Actions</h3>
           <button
-            onClick={() => setIsDMOpen(true)}
-            className="fixed bottom-6 right-6 bg-neon-green text-black p-4 rounded-full shadow-[0_0_20px_rgba(66,255,147,0.4)] hover:scale-110 transition-transform z-40"
+            onClick={() => setShowQuickDM(true)}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl flex items-center gap-4 transition-all group"
           >
-            <MessageSquare className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-full bg-neon-green/20 flex items-center justify-center text-neon-green group-hover:scale-110 transition-transform">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <h4 className="font-bold text-white">Send Quick DM</h4>
+              <p className="text-xs text-gray-400">Message your crush anonymously</p>
+            </div>
           </button>
-          <QuickDM isOpen={isDMOpen} onClose={() => setIsDMOpen(false)} />
-        </>
-      )}
+        </div>
+      </div>
+
+      <QuickDM isOpen={showQuickDM} onClose={() => setShowQuickDM(false)} />
+      <BottomNav />
     </div>
   )
 }

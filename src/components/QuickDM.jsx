@@ -1,30 +1,59 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Send, X, ShieldAlert, MessageSquare } from 'lucide-react'
 import { checkTextSafety } from '../lib/moderation/geminiTextCheck'
+import { updateTrustScore, TRUST_ACTIONS } from '../lib/trust/updateTrustScore'
+import { supabase } from '../lib/supabase'
 
 const QuickDM = ({ isOpen, onClose }) => {
     const [message, setMessage] = useState('')
     const [isChecking, setIsChecking] = useState(false)
     const [error, setError] = useState(null)
+    const [trustScore, setTrustScore] = useState(500)
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchScore = async () => {
+                try {
+                    const fakeUserId = '00000000-0000-0000-0000-000000000000'
+                    const { data, error } = await supabase.from('profiles').select('trust_score').eq('id', fakeUserId).single()
+                    if (error) throw error
+                    if (data) setTrustScore(data.trust_score)
+                } catch (err) {
+                    console.warn("Using default trust score (500)")
+                    setTrustScore(500)
+                }
+            }
+            fetchScore()
+        }
+    }, [isOpen])
+
+    const isRestricted = trustScore < 300
 
     if (!isOpen) return null
 
     const handleSend = async () => {
         if (!message.trim()) return
+        if (isRestricted) {
+            setError("Restricted Mode: Cannot send DMs.")
+            return
+        }
 
         setIsChecking(true)
         setError(null)
 
         const result = await checkTextSafety(message)
+        const fakeUserId = '00000000-0000-0000-0000-000000000000'
 
         setIsChecking(false)
 
         if (result.safe) {
-            alert("Message Sent! (Mock)")
+            alert("Message Sent! (+1 Trust Score)")
+            await updateTrustScore(fakeUserId, TRUST_ACTIONS.MESSAGE_SENT)
             setMessage('')
             onClose()
         } else {
             setError(result.reason)
+            await updateTrustScore(fakeUserId, TRUST_ACTIONS.AI_TOXIC_MESSAGE)
         }
     }
 
