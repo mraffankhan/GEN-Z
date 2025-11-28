@@ -1,18 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #FFFFFF;
-  --color-card-bg: #F8F8F8;
+  --color-bg: #F8F9FB;
+  --color-card-bg: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-primary: #6366F1;
+  --color-primary-hover: #4F46E5;
   --color-text-primary: #111111;
-  --color-text-secondary: #555555;
-  --color-neon-purple: #A855F7;
-  --color-neon-green: #10FF84;
-  --font-cyber: "Inter", "Poppins", sans-serif;
-  /* Keep font if not explicitly removed */
+  --color-text-secondary: #666666;
+  --color-text-subtle: #999999;
+  --font-sans: "Poppins", "Inter", sans-serif;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
-  font-family: var(--font-cyber);
+  font-family: var(--font-sans);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility card-shadow {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+@utility soft-shadow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }

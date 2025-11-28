@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import BottomNav from '../components/BottomNav'
+
 import StoreCard from '../components/StoreCard'
 import { Coins, ArrowLeft, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -65,7 +65,7 @@ const StorePage = () => {
 
     if (!isApproved) {
         return (
-            <div className="min-h-screen bg-gray-50 text-gray-900 pb-24 p-4 flex flex-col items-center justify-center text-center">
+            <div className="min-h-screen bg-gray-50 text-gray-900 p-4 flex flex-col items-center justify-center text-center">
                 <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 max-w-sm w-full">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Lock className="w-8 h-8 text-gray-400" />
@@ -79,7 +79,7 @@ const StorePage = () => {
                         Go Back Home
                     </Link>
                 </div>
-                <BottomNav />
+
             </div>
         )
     }
@@ -87,7 +87,7 @@ const StorePage = () => {
     const ownedItemIds = Array.isArray(profile?.cosmetics) ? profile.cosmetics.map(c => c.id) : []
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 pb-24 p-4">
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
             <div className="max-w-md mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -120,7 +120,7 @@ const StorePage = () => {
                     </div>
                 )}
             </div>
-            <BottomNav />
+
         </div>
     )
 }

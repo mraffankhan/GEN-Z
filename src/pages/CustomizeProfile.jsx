@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import BottomNav from '../components/BottomNav'
+
 import CosmeticPreview from '../components/CosmeticPreview'
 import { ArrowLeft, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -48,7 +48,7 @@ const CustomizeProfile = () => {
     const filteredItems = cosmetics.filter(item => item.type === activeTab)
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 pb-24 p-4">
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
             <div className="max-w-md mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -65,6 +65,7 @@ const CustomizeProfile = () => {
                         activeBorder={localUser?.active_border}
                         activeBadge={localUser?.active_badge}
                         activeGlow={localUser?.active_name_glow}
+                        cosmetics={localUser?.cosmetics || {}}
                     />
                 </div>
 
@@ -124,7 +125,7 @@ const CustomizeProfile = () => {
                     </div>
                 )}
             </div>
-            <BottomNav />
+
         </div>
     )
 }

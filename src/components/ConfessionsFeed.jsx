@@ -155,15 +155,15 @@ const ConfessionsFeed = () => {
         <div className="w-full max-w-md mt-8">
             <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2">
-                    <MessageSquare className="text-neon-purple w-6 h-6" />
-                    <h2 className="text-xl font-cyber text-neon-purple tracking-tight">Campus Confessions</h2>
+                    <MessageSquare className="text-primary w-6 h-6" />
+                    <h2 className="text-xl font-bold text-primary tracking-tight">Campus Confessions</h2>
                 </div>
                 <button
                     disabled={!canPost}
                     onClick={() => setShowInput(!showInput)}
                     className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-sm
             ${canPost
-                            ? 'bg-neon-purple text-white hover:bg-purple-600'
+                            ? 'bg-primary text-white hover:bg-primary-hover'
                             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         }`}
                     title={!canPost ? "Verify to unlock posting" : "Post a confession"}
@@ -180,7 +180,7 @@ const ConfessionsFeed = () => {
                         value={newConfession}
                         onChange={(e) => setNewConfession(e.target.value)}
                         placeholder="What's on your mind? (Anonymous)"
-                        className="w-full bg-gray-50 text-gray-900 p-3 rounded-xl border border-gray-200 focus:border-neon-purple focus:outline-none resize-none h-24 mb-3"
+                        className="w-full bg-gray-50 text-gray-900 p-3 rounded-xl border border-gray-200 focus:border-primary focus:outline-none resize-none h-24 mb-3"
                     />
 
                     <input
@@ -188,7 +188,7 @@ const ConfessionsFeed = () => {
                         value={tag}
                         onChange={(e) => setTag(e.target.value)}
                         placeholder="Tag (optional)"
-                        className="w-full bg-gray-50 text-gray-900 p-2 rounded-lg border border-gray-200 focus:border-neon-purple focus:outline-none mb-3 text-sm"
+                        className="w-full bg-gray-50 text-gray-900 p-2 rounded-lg border border-gray-200 focus:border-primary focus:outline-none mb-3 text-sm"
                     />
 
                     {error && (
@@ -202,7 +202,7 @@ const ConfessionsFeed = () => {
                         <button
                             onClick={handlePost}
                             disabled={isChecking || !newConfession.trim()}
-                            className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold hover:bg-neon-purple transition-colors flex items-center gap-2 disabled:opacity-50"
+                            className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold hover:bg-primary transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
                             {isChecking ? 'Checking AI...' : <><Send className="w-4 h-4" /> Post</>}
                         </button>
@@ -232,7 +232,7 @@ const ConfessionsFeed = () => {
                                 </div>
                                 <span className="text-sm font-bold text-gray-900">Anonymous</span>
                                 {confession.tag && (
-                                    <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-neon-purple bg-opacity-10 text-neon-purple text-xs font-bold">
+                                    <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
                                         <TagIcon className="w-3 h-3" />
                                         {confession.tag}
                                     </div>
@@ -253,9 +253,9 @@ const ConfessionsFeed = () => {
 
             {!isApproved && (
                 <div className="text-center mt-6 text-sm text-gray-500 flex items-center justify-center gap-2">
-                    <Lock className="w-4 h-4 text-neon-purple" />
+                    <Lock className="w-4 h-4 text-primary" />
                     <span>
-                        <Link to="/verify/upload" className="text-neon-purple font-bold hover:underline">Verify your ID</Link> to post anonymously.
+                        <Link to="/verify/upload" className="text-primary font-bold hover:underline">Verify your ID</Link> to post anonymously.
                     </span>
                 </div>
             )}
