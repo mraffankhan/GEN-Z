@@ -6,7 +6,7 @@ import ProfileStats from '../components/ProfileStats'
 import LogoutButton from '../components/LogoutButton'
 import BaseCard from '../components/BaseCard'
 import BaseButton from '../components/BaseButton'
-import CosmeticAvatar from '../components/Avatar/CosmeticAvatar'
+import AvatarRenderer from '../components/Avatar/AvatarRenderer'
 import CosmeticName from '../components/Text/CosmeticName'
 
 const Profile = () => {
@@ -44,14 +44,9 @@ const Profile = () => {
                     <div className="flex flex-col items-center mb-6">
                         {/* Avatar */}
                         <div className="mb-4">
-                            <CosmeticAvatar
-                                src={profile.avatar_url}
-                                alt={profile.username}
+                            <AvatarRenderer
+                                profile={profile}
                                 size="2xl"
-                                activeBadge={active_badge}
-                                activeBorder={active_border}
-                                cosmetics={cosmetics}
-                                isVerified={isVerified}
                             />
                         </div>
 

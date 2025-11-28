@@ -1,6 +1,6 @@
 import React, { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CosmeticAvatar from '../../components/Avatar/CosmeticAvatar'
+import AvatarRenderer from '../../components/Avatar/AvatarRenderer'
 import CosmeticName from '../../components/Text/CosmeticName'
 
 const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
@@ -20,14 +20,9 @@ const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
             <div className={`flex items-end gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                 {/* Avatar */}
                 <div className="flex-shrink-0 cursor-pointer" onClick={() => onProfileClick(message.sender_id)}>
-                    <CosmeticAvatar
-                        src={displayProfile.avatar_url}
-                        alt={displayProfile.username}
+                    <AvatarRenderer
+                        profile={displayProfile}
                         size="sm"
-                        activeBadge={displayProfile.active_badge}
-                        activeBorder={displayProfile.active_border}
-                        cosmetics={displayProfile.cosmetics || {}}
-                        isVerified={displayProfile.verification_status === 'approved'}
                     />
                 </div>
 

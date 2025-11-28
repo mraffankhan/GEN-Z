@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, Info, Loader2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
-import { useUser } from '../../context/UserContext'
+import { ArrowLeft, Send, Info, Loader2, MoreVertical } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useUser } from '../context/UserContext'
 import { Virtuoso } from 'react-virtuoso'
-import MessageBubble from './MessageBubble'
-import AvatarRenderer from '../../components/Avatar/AvatarRenderer'
+import MessageBubble from '../modules/youth-connect/MessageBubble'
+import AvatarRenderer from '../components/Avatar/AvatarRenderer'
+import CosmeticName from '../components/Text/CosmeticName'
 
-const CategoryRoom = () => {
-    const { categoryId } = useParams()
+const DMRoom = () => {
+    const { userId: targetUserId } = useParams()
     const navigate = useNavigate()
     const { user } = useUser()
 
@@ -16,14 +17,33 @@ const CategoryRoom = () => {
     const [profiles, setProfiles] = useState({}) // Cache: { userId: profileData }
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
-    const [firstItemIndex, setFirstItemIndex] = useState(10000) // Start high for prepend support
+    const [firstItemIndex, setFirstItemIndex] = useState(10000)
 
     const virtuosoRef = useRef(null)
     const subscriptionRef = useRef(null)
 
-    const categoryName = categoryId?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    // 1. Fetch Target Profile & Cache
+    useEffect(() => {
+        const fetchTargetProfile = async () => {
+            if (!targetUserId) return
 
-    // 1. Profile Caching Helper
+            const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', targetUserId)
+                .single()
+
+            if (data) {
+                setProfiles(prev => ({ ...prev, [targetUserId]: data }))
+            }
+        }
+
+        // Also ensure my own profile is in cache if needed, though context has it usually.
+        // We'll rely on the resolveProfiles helper for consistency.
+        fetchTargetProfile()
+    }, [targetUserId])
+
+    // 2. Profile Caching Helper
     const resolveProfiles = useCallback(async (userIds) => {
         const missingIds = userIds.filter(id => !profiles[id])
         if (missingIds.length === 0) return
@@ -42,14 +62,18 @@ const CategoryRoom = () => {
         }
     }, [profiles])
 
-    // 2. Initial Fetch
+    // 3. Initial Fetch
     useEffect(() => {
+        if (!user || !targetUserId) return
+
         const fetchInitialMessages = async () => {
             setLoading(true)
+
+            // Fetch messages where (sender=me AND receiver=them) OR (sender=them AND receiver=me)
             const { data, error } = await supabase
-                .from('category_messages')
-                .select('*') // No joins!
-                .eq('room_id', categoryId)
+                .from('direct_messages')
+                .select('*')
+                .or(`and(sender_id.eq.${user.id},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${user.id})`)
                 .order('created_at', { ascending: false })
                 .limit(50)
 
@@ -57,7 +81,7 @@ const CategoryRoom = () => {
                 const reversed = data.reverse()
                 setMessages(reversed)
 
-                // Extract User IDs and fetch profiles
+                // Ensure profiles are loaded
                 const userIds = [...new Set(reversed.map(m => m.sender_id))]
                 resolveProfiles(userIds)
             }
@@ -66,20 +90,19 @@ const CategoryRoom = () => {
 
         fetchInitialMessages()
 
-        // 3. Realtime Subscription (One listener only)
+        // 4. Realtime Subscription
         const channel = supabase
-            .channel(`room:${categoryId}`)
+            .channel(`dm:${user.id}-${targetUserId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'category_messages',
-                filter: `room_id=eq.${categoryId}`
+                table: 'direct_messages',
+                filter: `receiver_id=eq.${user.id}` // Listen for messages sent TO me
             }, (payload) => {
-                const newMsg = payload.new
-                setMessages(prev => [...prev, newMsg])
-
-                // Check if we need to fetch this user's profile
-                resolveProfiles([newMsg.sender_id])
+                if (payload.new.sender_id === targetUserId) {
+                    setMessages(prev => [...prev, payload.new])
+                    resolveProfiles([payload.new.sender_id])
+                }
             })
             .subscribe()
 
@@ -88,17 +111,17 @@ const CategoryRoom = () => {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [categoryId, resolveProfiles])
+    }, [user, targetUserId, resolveProfiles])
 
-    // 4. Load More (Prepend)
+    // 5. Load More (Prepend)
     const loadMore = useCallback(async () => {
         const oldestMessage = messages[0]
-        if (!oldestMessage) return
+        if (!oldestMessage || !user) return
 
         const { data } = await supabase
-            .from('category_messages')
+            .from('direct_messages')
             .select('*')
-            .eq('room_id', categoryId)
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${user.id})`)
             .lt('created_at', oldestMessage.created_at)
             .order('created_at', { ascending: false })
             .limit(50)
@@ -108,50 +131,47 @@ const CategoryRoom = () => {
             const userIds = [...new Set(reversed.map(m => m.sender_id))]
             resolveProfiles(userIds)
 
-            // Prepend messages and adjust index to maintain position
             setFirstItemIndex(prev => prev - reversed.length)
             setMessages(prev => [...reversed, ...prev])
             return reversed.length
         }
         return 0
-    }, [messages, categoryId, resolveProfiles])
+    }, [messages, user, targetUserId, resolveProfiles])
 
     const handleSendMessage = async (e) => {
         e.preventDefault()
         if (!newMessage.trim() || !user) return
 
         const content = newMessage.trim()
-        setNewMessage('') // Optimistic clear
+        setNewMessage('')
 
-        // Optimistic UI Update (Optional, but makes it feel instant)
+        // Optimistic Update
         const optimisticMsg = {
             id: `temp-${Date.now()}`,
-            room_id: categoryId,
             sender_id: user.id,
+            receiver_id: targetUserId,
             content: content,
             created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, optimisticMsg])
 
         const { error } = await supabase
-            .from('category_messages')
+            .from('direct_messages')
             .insert([
                 {
-                    room_id: categoryId,
                     sender_id: user.id,
-                    content: content,
-                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+                    receiver_id: targetUserId,
+                    content: content
                 }
             ])
 
         if (error) {
             console.error("Failed to send:", error)
-            setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id)) // Revert on error
+            setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
             setNewMessage(content)
         }
     }
 
-    // Memoize item content for Virtuoso
     const itemContent = useCallback((index, message) => {
         return (
             <div className="px-4 py-1">
@@ -165,38 +185,53 @@ const CategoryRoom = () => {
         )
     }, [profiles, user, navigate])
 
-    // Get current user profile for header
-    const userProfile = profiles[user?.id] || user?.user_metadata || {}
+    const targetProfile = profiles[targetUserId]
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-[#F7F8FA] text-text-primary">
+        <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-white text-gray-900">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm z-20">
+            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm z-20">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => navigate('/youth-connect')} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
-                        <ArrowLeft className="w-6 h-6 text-text-primary" />
+                    <button onClick={() => navigate('/dms')} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
+                        <ArrowLeft className="w-6 h-6 text-gray-700" />
                     </button>
-                    <div>
-                        <h2 className="font-bold text-lg text-text-primary leading-tight">{categoryName}</h2>
-                        <div className="flex items-center gap-1.5 text-xs text-green-500 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            <span>Online</span>
+
+                    {targetProfile ? (
+                        <div className="flex items-center gap-3" onClick={() => navigate(`/profile/${targetUserId}`)}>
+                            <AvatarRenderer
+                                profile={targetProfile}
+                                size="sm"
+                            />
+                            <div>
+                                <div className="font-bold text-sm text-gray-900 leading-tight">
+                                    <CosmeticName
+                                        name={targetProfile.display_name || targetProfile.username}
+                                        cosmetics={targetProfile.cosmetics || {}}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-green-500 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                    <span>Online</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+                            <div className="w-24 h-4 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                    )}
                 </div>
-                <button onClick={() => navigate(`/youth-connect/info/${categoryId}`)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-                    <Info className="w-6 h-6 text-text-secondary" />
+                <button className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                    <MoreVertical className="w-5 h-5 text-gray-500" />
                 </button>
             </div>
 
-            {/* Messages Area (Virtualized) */}
-            <div
-                className="flex-1 bg-[#EFE7DD] bg-opacity-30"
-                style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/subtle-white-feathers.png")' }}
-            >
+            {/* Messages Area */}
+            <div className="flex-1 bg-gray-50">
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                     </div>
                 ) : (
                     <Virtuoso
@@ -221,13 +256,13 @@ const CategoryRoom = () => {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
-                        className="flex-grow bg-[#F1F3F5] text-text-primary px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-400 text-base"
+                        className="flex-grow bg-gray-100 text-gray-900 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-400 text-base"
                         autoFocus
                     />
                     <button
                         type="submit"
                         disabled={!newMessage.trim()}
-                        className="p-3 bg-primary rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover shadow-md shadow-primary/20 transition-all active:scale-95 flex-shrink-0"
+                        className="p-3 bg-blue-600 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 shadow-md shadow-blue-200 transition-all active:scale-95 flex-shrink-0"
                     >
                         <Send className="w-5 h-5" />
                     </button>
@@ -237,4 +272,4 @@ const CategoryRoom = () => {
     )
 }
 
-export default CategoryRoom
+export default DMRoom

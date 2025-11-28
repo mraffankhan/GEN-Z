@@ -6,7 +6,7 @@ import BaseCard from '../components/BaseCard'
 import BaseButton from '../components/BaseButton'
 import PageHeader from '../components/PageHeader'
 import { useUser } from '../context/UserContext'
-import CosmeticAvatar from '../components/Avatar/CosmeticAvatar'
+import AvatarRenderer from '../components/Avatar/AvatarRenderer'
 import CosmeticName from '../components/Text/CosmeticName'
 
 const PublicProfile = () => {
@@ -68,14 +68,9 @@ const PublicProfile = () => {
                 {/* Profile Header */}
                 <div className="flex flex-col items-center text-center">
                     <div className="mb-4">
-                        <CosmeticAvatar
-                            src={profile.avatar_url}
-                            alt={profile.username}
+                        <AvatarRenderer
+                            profile={profile}
                             size="2xl"
-                            activeBadge={profile.active_badge}
-                            activeBorder={profile.active_border}
-                            cosmetics={profile.cosmetics || {}}
-                            isVerified={profile.verification_status === 'approved'}
                         />
                     </div>
                     <h1 className="text-2xl font-bold text-text-primary">
@@ -90,14 +85,14 @@ const PublicProfile = () => {
                     )}
 
                     {!isMe && (
-                        <div className="mt-6">
-                            <BaseButton
+                        <div className="mt-6 w-full max-w-xs">
+                            <button
                                 onClick={() => navigate(`/dms/${profile.id}`)}
-                                className="flex items-center gap-2"
+                                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all"
                             >
-                                <MessageSquare className="w-4 h-4" />
+                                <MessageSquare className="w-5 h-5" />
                                 Message
-                            </BaseButton>
+                            </button>
                         </div>
                     )}
                 </div>

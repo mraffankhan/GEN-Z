@@ -67,5 +67,25 @@ ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read access" ON jobs
     FOR SELECT USING (true);
 
+-- Create Direct Messages table
+DROP TABLE IF EXISTS direct_messages;
+CREATE TABLE direct_messages (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    sender_id UUID REFERENCES public.profiles(id) NOT NULL,
+    receiver_id UUID REFERENCES public.profiles(id) NOT NULL,
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for direct_messages
+ALTER TABLE direct_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read their own messages" ON direct_messages
+    FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+CREATE POLICY "Users can insert messages" ON direct_messages
+    FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
 -- Only admins should insert jobs (you can adjust this policy)
 -- CREATE POLICY "Admin insert access" ON jobs ...

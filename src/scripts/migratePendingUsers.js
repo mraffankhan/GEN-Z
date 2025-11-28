@@ -14,22 +14,23 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
 
+// DRY RUN FLAG - Set to false to actually update DB
+const DRY_RUN = true;
+
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_API_KEY) {
   console.error('❌ Missing environment variables.');
-  console.error('URL:', SUPABASE_URL ? 'Set' : 'Missing');
-  console.error('KEY:', SUPABASE_KEY ? 'Set' : 'Missing');
-  console.error('GEMINI:', GEMINI_API_KEY ? 'Set' : 'Missing');
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// Using gemini-2.0-flash as it is reliable and supports vision
-const MODEL_NAME = 'gemini-2.0-flash';
+// Use gemini-1.5-flash for cost/speed balance, it supports vision
+const MODEL_NAME = 'gemini-1.5-flash';
 
 async function migrate() {
-  console.log('🚀 Starting Migration: Verifying Pending Users...');
+  console.log(`🚀 Starting Migration: Verifying Pending Users...`);
+  console.log(`🔧 Mode: ${DRY_RUN ? 'DRY RUN (No DB updates)' : 'LIVE (Updates DB)'}`);
 
   // 1. Fetch pending users
   const { data: users, error } = await supabase
@@ -47,10 +48,11 @@ async function migrate() {
   let approvedCount = 0;
   let rejectedCount = 0;
   let resubmitCount = 0;
+  const actions = [];
 
   for (const user of users) {
     console.log(`\n--------------------------------------------------`);
-    console.log(`Verifying user ${user.id}...`);
+    console.log(`Verifying user ${user.id} (${user.username || 'No Name'})...`);
 
     if (!user.id_image_url) {
       console.log('⚠️ No ID Image URL found. Skipping.');
@@ -59,7 +61,6 @@ async function migrate() {
 
     try {
       // 2. Download Image
-      // console.log(`Downloading ID: ${user.id_image_url}`);
       const imageResp = await fetch(user.id_image_url);
       if (!imageResp.ok) throw new Error(`Failed to fetch image: ${imageResp.statusText}`);
 
@@ -68,7 +69,6 @@ async function migrate() {
       const base64Image = Buffer.from(arrayBuffer).toString('base64');
 
       // 3. Call Gemini
-      // console.log(`Sending to Gemini (${MODEL_NAME})...`);
       const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
       const prompt = `
@@ -118,26 +118,39 @@ async function migrate() {
       let newStatus = 'rejected';
       if (analysis.score > 70 && (!analysis.issues || analysis.issues.length === 0)) {
         newStatus = 'approved';
-        console.log(`Approved with score ${analysis.score}`);
+        console.log(`✅ Approved with score ${analysis.score}`);
       } else {
-        console.log(`Rejected: issues [${analysis.issues?.join(', ') || 'Low Score'}]`);
+        console.log(`❌ Rejected: issues [${analysis.issues?.join(', ') || 'Low Score'}]`);
       }
 
-      // 5. Update Supabase
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          verification_status: newStatus,
-          ai_score: analysis.score,
-          ai_name: analysis.name,
-          ai_college: analysis.college,
-          ai_issues: analysis.issues
-        })
-        .eq('id', user.id);
+      actions.push({
+        id: user.id,
+        username: user.username,
+        status: newStatus,
+        score: analysis.score,
+        issues: analysis.issues?.join('|')
+      });
 
-      if (updateError) {
-        console.error('❌ Failed to update Supabase:', updateError);
-        resubmitCount++;
+      // 5. Update Supabase (Only if NOT Dry Run)
+      if (!DRY_RUN) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            verification_status: newStatus,
+            ai_score: analysis.score,
+            ai_name: analysis.name,
+            ai_college: analysis.college,
+            ai_issues: analysis.issues
+          })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error('❌ Failed to update Supabase:', updateError);
+          resubmitCount++;
+        } else {
+          if (newStatus === 'approved') approvedCount++;
+          else rejectedCount++;
+        }
       } else {
         if (newStatus === 'approved') approvedCount++;
         else rejectedCount++;
@@ -145,26 +158,23 @@ async function migrate() {
 
     } catch (err) {
       console.error('❌ Error processing user:', err.message);
-
-      // Mark as needs_resubmit if API failed
-      const { error: errorUpdate } = await supabase
-        .from('profiles')
-        .update({ verification_status: 'needs_resubmit' })
-        .eq('id', user.id);
-
-      if (errorUpdate) console.error('Failed to mark as needs_resubmit');
-
       resubmitCount++;
     }
   }
 
   console.log(`\n==================================================`);
-  console.log(`Migration Complete.`);
+  console.log(`Migration Complete (${DRY_RUN ? 'DRY RUN' : 'LIVE'}).`);
   console.log(`Total Processed: ${users.length}`);
   console.log(`Approved: ${approvedCount}`);
   console.log(`Rejected: ${rejectedCount}`);
-  console.log(`Errors/Resubmit: ${resubmitCount}`);
+  console.log(`Errors: ${resubmitCount}`);
   console.log(`==================================================`);
+
+  if (DRY_RUN) {
+    console.log("Actions CSV Preview:");
+    console.log("id,username,status,score,issues");
+    actions.forEach(a => console.log(`${a.id},${a.username},${a.status},${a.score},${a.issues}`));
+  }
 }
 
 migrate();

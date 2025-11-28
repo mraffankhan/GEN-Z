@@ -11,6 +11,7 @@ import PublicProfile from './pages/PublicProfile'
 
 import FlashChatPage from './pages/FlashChatPage'
 import DMsPage from './pages/DMsPage'
+import DMRoom from './pages/DMRoom'
 import StorePage from './pages/StorePage'
 import CustomizeProfile from './pages/CustomizeProfile'
 import EditProfile from './pages/EditProfile'
@@ -59,6 +60,7 @@ function App() {
           <Route path="/opportunities/:jobId" element={<RequireAuth><Layout><JobDetails /></Layout></RequireAuth>} />
           <Route path="/opportunities/apply/:jobId" element={<RequireAuth><Layout><ApplyRedirect /></Layout></RequireAuth>} />
           <Route path="/dms" element={<RequireAuth><Layout><DMsPage /></Layout></RequireAuth>} />
+          <Route path="/dms/:userId" element={<RequireAuth><DMRoom /></RequireAuth>} />
 
           {/* Verification Flow (Protected) */}
           <Route path="/verify/start" element={<RequireAuth><VerificationStart /></RequireAuth>} />
