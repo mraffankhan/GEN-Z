@@ -16,7 +16,7 @@ const CosmeticPreview = ({ activeBorder, activeBadge, activeGlow, cosmetics = {}
         active_badge: activeBadge,
         active_border: activeBorder,
         cosmetics: previewCosmetics,
-        verification_status: 'approved'
+
     }
 
     return (

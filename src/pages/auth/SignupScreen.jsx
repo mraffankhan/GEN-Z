@@ -41,7 +41,7 @@ const SignupScreen = () => {
                     .insert({
                         id: data.user.id,
                         email: data.user.email,
-                        verification_status: 'not_submitted',
+
                         trust_score: 500,
                         coins: 0,
                         created_at: new Date().toISOString()
@@ -58,10 +58,7 @@ const SignupScreen = () => {
 
     return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 relative">
-            {/* Back Button */}
-            <Link to="/auth/login" className="absolute top-6 left-6 p-2 rounded-full bg-gray-50 hover:bg-gray-100 transition-colors">
-                <ArrowLeft className="w-6 h-6 text-gray-600" />
-            </Link>
+
 
             <div className="w-full max-w-sm">
                 <div className="text-center mb-10">

@@ -11,7 +11,7 @@ const LogoutButton = () => {
     const handleLogoutConfirm = async () => {
         try {
             await supabase.auth.signOut()
-            navigate('/auth/login')
+            navigate('/auth/login', { replace: true })
         } catch (error) {
             console.error('Logout failed:', error)
             // Optional: Show a toast or error state here

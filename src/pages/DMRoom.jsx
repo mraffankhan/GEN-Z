@@ -50,7 +50,7 @@ const DMRoom = () => {
 
         const { data } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, display_name, active_badge, active_border, cosmetics, verification_status')
+            .select('id, username, avatar_url, display_name, active_badge, active_border, cosmetics')
             .in('id', missingIds)
 
         if (data) {

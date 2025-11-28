@@ -11,7 +11,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT 500;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'not_submitted';
+
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS active_border TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS active_badge TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS animation_type TEXT;

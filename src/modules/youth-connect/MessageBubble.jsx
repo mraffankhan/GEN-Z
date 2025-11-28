@@ -12,7 +12,7 @@ const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
         active_badge: null,
         active_border: null,
         cosmetics: {},
-        verification_status: 'pending'
+
     }
 
     return (

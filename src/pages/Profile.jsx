@@ -19,14 +19,10 @@ const Profile = () => {
         display_name,
         trust_score = 500,
         coins = 0,
-        verification_status,
-        active_border,
         active_badge,
         bio,
         cosmetics = {}
     } = profile
-
-    const isVerified = verification_status === 'approved'
 
     return (
         <div className="min-h-screen bg-bg text-text-primary p-4 pb-24">

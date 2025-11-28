@@ -30,7 +30,7 @@ const AvatarRenderer = ({
             activeBadge={profile.active_badge}
             activeBorder={profile.active_border}
             cosmetics={profile.cosmetics || {}}
-            isVerified={profile.verification_status === 'approved'}
+
             className={className}
             onClick={onClick}
         />

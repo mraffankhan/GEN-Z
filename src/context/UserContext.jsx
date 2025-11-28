@@ -26,7 +26,7 @@ export const UserProvider = ({ children }) => {
                 const newProfile = {
                     id: userId,
                     email: userEmail,
-                    verification_status: 'not_submitted',
+
                     trust_score: 500,
                     coins: 0,
                     created_at: new Date().toISOString()

@@ -11,7 +11,7 @@ const StorePage = () => {
     const [items, setItems] = useState([])
     const [loading, setLoading] = useState(true)
 
-    const isApproved = profile?.verification_status === 'approved'
+
 
     useEffect(() => {
         if (isApproved) {

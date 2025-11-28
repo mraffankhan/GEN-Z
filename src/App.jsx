@@ -2,10 +2,7 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { UserProvider } from './context/UserContext'
 import Home from './pages/Home'
-import VerificationStart from './pages/VerificationStart'
-import UploadID from './components/UploadID'
-import VerificationPending from './pages/VerificationPending'
-import AdminVerification from './pages/AdminVerification'
+
 import Profile from './pages/Profile'
 import PublicProfile from './pages/PublicProfile'
 
@@ -29,16 +26,18 @@ import Logout from './pages/auth/Logout'
 import RequireAuth from './components/auth/RequireAuth'
 import Layout from './components/Layout'
 
+import PublicOnlyRoute from './components/auth/PublicOnlyRoute'
+
 function App() {
   return (
     <UserProvider>
       <Router>
         <Routes>
           {/* Auth Routes */}
-          <Route path="/auth/login" element={<LoginScreen />} />
-          <Route path="/auth/signup" element={<SignupScreen />} />
-          <Route path="/auth/forgot" element={<ForgotPassword />} />
-          <Route path="/auth/reset" element={<ResetPassword />} />
+          <Route path="/auth/login" element={<PublicOnlyRoute><LoginScreen /></PublicOnlyRoute>} />
+          <Route path="/auth/signup" element={<PublicOnlyRoute><SignupScreen /></PublicOnlyRoute>} />
+          <Route path="/auth/forgot" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+          <Route path="/auth/reset" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
           <Route path="/logout" element={<Logout />} />
 
           {/* Protected Routes */}
@@ -62,13 +61,7 @@ function App() {
           <Route path="/dms" element={<RequireAuth><Layout><DMsPage /></Layout></RequireAuth>} />
           <Route path="/dms/:userId" element={<RequireAuth><DMRoom /></RequireAuth>} />
 
-          {/* Verification Flow (Protected) */}
-          <Route path="/verify/start" element={<RequireAuth><VerificationStart /></RequireAuth>} />
-          <Route path="/verify/upload" element={<RequireAuth><UploadID /></RequireAuth>} />
-          <Route path="/verify/pending" element={<RequireAuth><VerificationPending /></RequireAuth>} />
 
-          {/* Admin (Protected) */}
-          <Route path="/admin/verification" element={<RequireAuth><AdminVerification /></RequireAuth>} />
         </Routes>
       </Router>
     </UserProvider>
