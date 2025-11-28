@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 import StoreCard from '../components/StoreCard'
-import { Coins, ArrowLeft, Lock } from 'lucide-react'
+import { Coins, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../context/UserContext'
 
@@ -14,12 +14,8 @@ const StorePage = () => {
 
 
     useEffect(() => {
-        if (isApproved) {
-            fetchData()
-        } else {
-            setLoading(false)
-        }
-    }, [isApproved])
+        fetchData()
+    }, [])
 
     const fetchData = async () => {
         const { data: storeItems } = await supabase.from('cosmetics_store').select('*')
@@ -63,26 +59,7 @@ const StorePage = () => {
 
     if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading Store...</div>
 
-    if (!isApproved) {
-        return (
-            <div className="min-h-screen bg-gray-50 text-gray-900 p-4 flex flex-col items-center justify-center text-center">
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 max-w-sm w-full">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Lock className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h1 className="text-2xl font-cyber text-gray-900 mb-2">Store Locked</h1>
-                    <p className="text-gray-500 mb-8">Verify your student ID to access exclusive cosmetics and badges.</p>
-                    <Link to="/verify/upload" className="block w-full py-3 bg-neon-purple text-white rounded-xl font-bold shadow-lg shadow-purple-200">
-                        Verify Now
-                    </Link>
-                    <Link to="/" className="block mt-4 text-sm text-gray-400 font-bold">
-                        Go Back Home
-                    </Link>
-                </div>
 
-            </div>
-        )
-    }
 
     const ownedItemIds = Array.isArray(profile?.cosmetics) ? profile.cosmetics.map(c => c.id) : []
 
