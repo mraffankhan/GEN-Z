@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, Info, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useUser } from '../../context/UserContext'
-import CosmeticAvatar from '../../components/Avatar/CosmeticAvatar'
-import CosmeticName from '../../components/Text/CosmeticName'
+import { Virtuoso } from 'react-virtuoso'
+import MessageBubble from './MessageBubble'
 
 const CategoryRoom = () => {
     const { categoryId } = useParams()
@@ -12,39 +12,60 @@ const CategoryRoom = () => {
     const { user } = useUser()
 
     const [messages, setMessages] = useState([])
+    const [profiles, setProfiles] = useState({}) // Cache: { userId: profileData }
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
-    const [loadingMore, setLoadingMore] = useState(false)
-    const [hasMore, setHasMore] = useState(true)
+    const [firstItemIndex, setFirstItemIndex] = useState(10000) // Start high for prepend support
 
-    const messagesEndRef = useRef(null)
-    const scrollContainerRef = useRef(null)
+    const virtuosoRef = useRef(null)
     const subscriptionRef = useRef(null)
 
     const categoryName = categoryId?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
-    // Initial Fetch (Last 50 messages)
+    // 1. Profile Caching Helper
+    const resolveProfiles = useCallback(async (userIds) => {
+        const missingIds = userIds.filter(id => !profiles[id])
+        if (missingIds.length === 0) return
+
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, display_name, active_badge, active_border, cosmetics, verification_status')
+            .in('id', missingIds)
+
+        if (data) {
+            setProfiles(prev => {
+                const newProfiles = { ...prev }
+                data.forEach(p => newProfiles[p.id] = p)
+                return newProfiles
+            })
+        }
+    }, [profiles])
+
+    // 2. Initial Fetch
     useEffect(() => {
         const fetchInitialMessages = async () => {
             setLoading(true)
             const { data, error } = await supabase
                 .from('category_messages')
-                .select('*, profiles(username, avatar_url, display_name, active_badge, active_border, cosmetics, verification_status)')
+                .select('*') // No joins!
                 .eq('room_id', categoryId)
-                .order('created_at', { ascending: false }) // Fetch newest first for pagination
+                .order('created_at', { ascending: false })
                 .limit(50)
 
             if (data) {
-                setMessages(data.reverse()) // Reverse to show oldest -> newest
-                if (data.length < 50) setHasMore(false)
+                const reversed = data.reverse()
+                setMessages(reversed)
+
+                // Extract User IDs and fetch profiles
+                const userIds = [...new Set(reversed.map(m => m.sender_id))]
+                resolveProfiles(userIds)
             }
             setLoading(false)
-            scrollToBottom(false)
         }
 
         fetchInitialMessages()
 
-        // Realtime Subscription
+        // 3. Realtime Subscription (One listener only)
         const channel = supabase
             .channel(`room:${categoryId}`)
             .on('postgres_changes', {
@@ -52,18 +73,12 @@ const CategoryRoom = () => {
                 schema: 'public',
                 table: 'category_messages',
                 filter: `room_id=eq.${categoryId}`
-            }, async (payload) => {
-                // Fetch full message details including profile
-                const { data } = await supabase
-                    .from('category_messages')
-                    .select('*, profiles(username, avatar_url, display_name, active_badge, active_border, cosmetics, verification_status)')
-                    .eq('id', payload.new.id)
-                    .single()
+            }, (payload) => {
+                const newMsg = payload.new
+                setMessages(prev => [...prev, newMsg])
 
-                if (data) {
-                    setMessages(prev => [...prev, data])
-                    scrollToBottom(true)
-                }
+                // Check if we need to fetch this user's profile
+                resolveProfiles([newMsg.sender_id])
             })
             .subscribe()
 
@@ -72,47 +87,33 @@ const CategoryRoom = () => {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [categoryId])
+    }, [categoryId, resolveProfiles])
 
-    // Scroll to bottom helper
-    const scrollToBottom = (smooth = true) => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    // 4. Load More (Prepend)
+    const loadMore = useCallback(async () => {
+        const oldestMessage = messages[0]
+        if (!oldestMessage) return
+
+        const { data } = await supabase
+            .from('category_messages')
+            .select('*')
+            .eq('room_id', categoryId)
+            .lt('created_at', oldestMessage.created_at)
+            .order('created_at', { ascending: false })
+            .limit(50)
+
+        if (data && data.length > 0) {
+            const reversed = data.reverse()
+            const userIds = [...new Set(reversed.map(m => m.sender_id))]
+            resolveProfiles(userIds)
+
+            // Prepend messages and adjust index to maintain position
+            setFirstItemIndex(prev => prev - reversed.length)
+            setMessages(prev => [...reversed, ...prev])
+            return reversed.length
         }
-    }
-
-    // Load More on Scroll Up
-    const handleScroll = async (e) => {
-        const { scrollTop } = e.currentTarget
-        if (scrollTop === 0 && hasMore && !loadingMore && !loading) {
-            setLoadingMore(true)
-            const oldestMessage = messages[0]
-            if (!oldestMessage) return
-
-            const { data } = await supabase
-                .from('category_messages')
-                .select('*, profiles(username, avatar_url, display_name, active_badge, active_border, cosmetics, verification_status)')
-                .eq('room_id', categoryId)
-                .lt('created_at', oldestMessage.created_at)
-                .order('created_at', { ascending: false })
-                .limit(50)
-
-            if (data && data.length > 0) {
-                const currentScrollHeight = scrollContainerRef.current.scrollHeight
-                setMessages(prev => [...data.reverse(), ...prev])
-
-                // Maintain scroll position
-                requestAnimationFrame(() => {
-                    if (scrollContainerRef.current) {
-                        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight - currentScrollHeight
-                    }
-                })
-            } else {
-                setHasMore(false)
-            }
-            setLoadingMore(false)
-        }
-    }
+        return 0
+    }, [messages, categoryId, resolveProfiles])
 
     const handleSendMessage = async (e) => {
         e.preventDefault()
@@ -120,6 +121,16 @@ const CategoryRoom = () => {
 
         const content = newMessage.trim()
         setNewMessage('') // Optimistic clear
+
+        // Optimistic UI Update (Optional, but makes it feel instant)
+        const optimisticMsg = {
+            id: `temp-${Date.now()}`,
+            room_id: categoryId,
+            sender_id: user.id,
+            content: content,
+            created_at: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, optimisticMsg])
 
         const { error } = await supabase
             .from('category_messages')
@@ -133,9 +144,24 @@ const CategoryRoom = () => {
 
         if (error) {
             console.error("Failed to send:", error)
-            setNewMessage(content) // Restore on error
+            setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id)) // Revert on error
+            setNewMessage(content)
         }
     }
+
+    // Memoize item content for Virtuoso
+    const itemContent = useCallback((index, message) => {
+        return (
+            <div className="px-4 py-1">
+                <MessageBubble
+                    message={message}
+                    isMe={message.sender_id === user?.id}
+                    profile={profiles[message.sender_id]}
+                    onProfileClick={(id) => navigate(`/profile/${id}`)}
+                />
+            </div>
+        )
+    }, [profiles, user, navigate])
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-[#F7F8FA] text-text-primary">
@@ -158,63 +184,28 @@ const CategoryRoom = () => {
                 </button>
             </div>
 
-            {/* Messages Area */}
+            {/* Messages Area (Virtualized) */}
             <div
-                ref={scrollContainerRef}
-                onScroll={handleScroll}
-                className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#EFE7DD] bg-opacity-30" // Subtle tint
-                style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/subtle-white-feathers.png")' }} // Optional texture
+                className="flex-1 bg-[#EFE7DD] bg-opacity-30"
+                style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/subtle-white-feathers.png")' }}
             >
-                {loadingMore && (
-                    <div className="flex justify-center py-2">
-                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
                     </div>
+                ) : (
+                    <Virtuoso
+                        ref={virtuosoRef}
+                        style={{ height: '100%' }}
+                        data={messages}
+                        firstItemIndex={firstItemIndex}
+                        initialTopMostItemIndex={messages.length - 1}
+                        startReached={loadMore}
+                        itemContent={itemContent}
+                        followOutput={'auto'}
+                        alignToBottom
+                    />
                 )}
-
-                {messages.map((msg, index) => {
-                    const isMe = msg.sender_id === user?.id
-
-                    return (
-                        <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
-                            <div className={`flex items-end gap-2 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                                {/* Cosmetic Avatar */}
-                                <CosmeticAvatar
-                                    src={msg.profiles?.avatar_url}
-                                    alt={msg.profiles?.username}
-                                    size="sm"
-                                    activeBadge={msg.profiles?.active_badge}
-                                    activeBorder={msg.profiles?.active_border}
-                                    cosmetics={msg.profiles?.cosmetics || {}}
-                                    isVerified={msg.profiles?.verification_status === 'approved'}
-                                    onClick={() => navigate(`/profile/${msg.sender_id}`)}
-                                    className="flex-shrink-0"
-                                />
-
-                                <div className="flex flex-col min-w-0">
-                                    {/* Sender Name - Above Bubble */}
-                                    <div className={`text-[11px] font-semibold mb-1 px-1 truncate ${isMe ? 'text-right text-gray-500' : 'text-left text-gray-600'}`}>
-                                        <CosmeticName
-                                            name={msg.profiles?.display_name || msg.profiles?.username || 'User'}
-                                            cosmetics={msg.profiles?.cosmetics || {}}
-                                        />
-                                    </div>
-
-                                    {/* Bubble */}
-                                    <div className={`px-4 py-2 rounded-2xl text-[15px] shadow-sm relative break-words ${isMe
-                                        ? 'bg-[#3B82F6] text-white rounded-tr-none'
-                                        : 'bg-[#FFFFFF] text-gray-900 rounded-tl-none'
-                                        }`}>
-                                        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                                        <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-blue-100' : 'text-gray-400'}`}>
-                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                })}
-                <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
@@ -226,6 +217,7 @@ const CategoryRoom = () => {
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
                         className="flex-grow bg-[#F1F3F5] text-text-primary px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-400 text-base"
+                        autoFocus
                     />
                     <button
                         type="submit"
