@@ -1,143 +1,143 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, Info, Loader2, MoreVertical } from 'lucide-react'
+import { ArrowLeft, Send, MoreVertical } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../context/UserContext'
 import { Virtuoso } from 'react-virtuoso'
 import MessageBubble from '../modules/youth-connect/MessageBubble'
-import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-
+import InitialsAvatar from '../components/InitialsAvatar'
+import SkeletonMessage from '../components/skeletons/SkeletonMessage'
+import { getDMMessages, getOlderDMMessages, fetchProfilesBatch, sendDMMessage } from '../lib/queries/messages'
 
 const DMRoom = () => {
     const { userId: targetUserId } = useParams()
     const navigate = useNavigate()
     const { user } = useUser()
 
-    const [messages, setMessages] = useState([])
-    const [profiles, setProfiles] = useState({}) // Cache: { userId: profileData }
+    // Use refs for mutable data
+    const messagesRef = useRef([])
+    const profilesRef = useRef({})
+    const channelRef = useRef(null)
+    const virtuosoRef = useRef(null)
+
+    // Minimal state for UI
+    const [messageVersion, setMessageVersion] = useState(0)
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
     const [firstItemIndex, setFirstItemIndex] = useState(10000)
 
-    const virtuosoRef = useRef(null)
-    const subscriptionRef = useRef(null)
+    // Stable profile resolution
+    const resolveProfiles = useCallback(async (userIds) => {
+        const missingIds = userIds.filter(id => !profilesRef.current[id])
+        if (missingIds.length === 0) return
 
-    // 1. Fetch Target Profile & Cache
+        const { data } = await fetchProfilesBatch(missingIds)
+        if (data) {
+            Object.assign(profilesRef.current, data)
+        }
+    }, [])
+
+    // Fetch target profile initially
     useEffect(() => {
+        if (!targetUserId) return
+
         const fetchTargetProfile = async () => {
-            if (!targetUserId) return
-
-            const { data } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', targetUserId)
-                .single()
-
+            const { data } = await fetchProfilesBatch([targetUserId])
             if (data) {
-                setProfiles(prev => ({ ...prev, [targetUserId]: data }))
+                profilesRef.current = { ...profilesRef.current, ...data }
+                setMessageVersion(v => v + 1)
             }
         }
 
-        // Also ensure my own profile is in cache if needed, though context has it usually.
-        // We'll rely on the resolveProfiles helper for consistency.
         fetchTargetProfile()
     }, [targetUserId])
 
-    // 2. Profile Caching Helper
-    const resolveProfiles = useCallback(async (userIds) => {
-        const missingIds = userIds.filter(id => !profiles[id])
-        if (missingIds.length === 0) return
-
-        const { data } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url, display_name')
-            .in('id', missingIds)
-
-        if (data) {
-            setProfiles(prev => {
-                const newProfiles = { ...prev }
-                data.forEach(p => newProfiles[p.id] = p)
-                return newProfiles
-            })
-        }
-    }, [profiles])
-
-    // 3. Initial Fetch
+    // Initial messages fetch
     useEffect(() => {
         if (!user || !targetUserId) return
 
         const fetchInitialMessages = async () => {
             setLoading(true)
 
-            // Fetch messages where (sender=me AND receiver=them) OR (sender=them AND receiver=me)
-            const { data, error } = await supabase
-                .from('direct_messages')
-                .select('*')
-                .or(`and(sender_id.eq.${user.id},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${user.id})`)
-                .order('created_at', { ascending: false })
-                .limit(50)
+            const { data, error } = await getDMMessages(user.id, targetUserId, 30)
 
-            if (data) {
-                const reversed = data.reverse()
-                setMessages(reversed)
+            if (data && !error) {
+                messagesRef.current = data
 
-                // Ensure profiles are loaded
-                const userIds = [...new Set(reversed.map(m => m.sender_id))]
-                resolveProfiles(userIds)
+                const userIds = [...new Set(data.map(m => m.sender_id))]
+                await resolveProfiles(userIds)
+
+                setMessageVersion(v => v + 1)
             }
+
             setLoading(false)
         }
 
         fetchInitialMessages()
+    }, [user, targetUserId, resolveProfiles])
 
-        // 4. Realtime Subscription
+    // WebSocket subscription
+    useEffect(() => {
+        if (!user || !targetUserId) return
+
+        const handleNewMessage = async (payload) => {
+            const newMsg = payload.new
+
+            // Only add if from target user
+            if (newMsg.sender_id === targetUserId) {
+                messagesRef.current = [...messagesRef.current, newMsg]
+                await resolveProfiles([newMsg.sender_id])
+                setMessageVersion(v => v + 1)
+            }
+        }
+
         const channel = supabase
             .channel(`dm:${user.id}-${targetUserId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'direct_messages',
-                filter: `receiver_id=eq.${user.id}` // Listen for messages sent TO me
-            }, (payload) => {
-                if (payload.new.sender_id === targetUserId) {
-                    setMessages(prev => [...prev, payload.new])
-                    resolveProfiles([payload.new.sender_id])
-                }
-            })
+                filter: `receiver_id=eq.${user.id}`
+            }, handleNewMessage)
             .subscribe()
 
-        subscriptionRef.current = channel
+        channelRef.current = channel
 
         return () => {
-            supabase.removeChannel(channel)
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current)
+                channelRef.current = null
+            }
         }
     }, [user, targetUserId, resolveProfiles])
 
-    // 5. Load More (Prepend)
+    // Load more
     const loadMore = useCallback(async () => {
-        const oldestMessage = messages[0]
-        if (!oldestMessage || !user) return
+        const messages = messagesRef.current
+        if (messages.length === 0 || !user) return
 
-        const { data } = await supabase
-            .from('direct_messages')
-            .select('*')
-            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${user.id})`)
-            .lt('created_at', oldestMessage.created_at)
-            .order('created_at', { ascending: false })
-            .limit(50)
+        const oldestMessage = messages[0]
+        const { data } = await getOlderDMMessages(
+            user.id,
+            targetUserId,
+            oldestMessage.created_at,
+            30
+        )
 
         if (data && data.length > 0) {
-            const reversed = data.reverse()
-            const userIds = [...new Set(reversed.map(m => m.sender_id))]
-            resolveProfiles(userIds)
+            const userIds = [...new Set(data.map(m => m.sender_id))]
+            await resolveProfiles(userIds)
 
-            setFirstItemIndex(prev => prev - reversed.length)
-            setMessages(prev => [...reversed, ...prev])
-            return reversed.length
+            messagesRef.current = [...data, ...messages]
+            setFirstItemIndex(prev => prev - data.length)
+            setMessageVersion(v => v + 1)
+
+            return data.length
         }
         return 0
-    }, [messages, user, targetUserId, resolveProfiles])
+    }, [user, targetUserId, resolveProfiles])
 
+    // Send message
     const handleSendMessage = async (e) => {
         e.preventDefault()
         if (!newMessage.trim() || !user) return
@@ -145,7 +145,6 @@ const DMRoom = () => {
         const content = newMessage.trim()
         setNewMessage('')
 
-        // Optimistic Update
         const optimisticMsg = {
             id: `temp-${Date.now()}`,
             sender_id: user.id,
@@ -153,21 +152,16 @@ const DMRoom = () => {
             content: content,
             created_at: new Date().toISOString()
         }
-        setMessages(prev => [...prev, optimisticMsg])
 
-        const { error } = await supabase
-            .from('direct_messages')
-            .insert([
-                {
-                    sender_id: user.id,
-                    receiver_id: targetUserId,
-                    content: content
-                }
-            ])
+        messagesRef.current = [...messagesRef.current, optimisticMsg]
+        setMessageVersion(v => v + 1)
+
+        const { error } = await sendDMMessage(user.id, targetUserId, content)
 
         if (error) {
             console.error("Failed to send:", error)
-            setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
+            messagesRef.current = messagesRef.current.filter(m => m.id !== optimisticMsg.id)
+            setMessageVersion(v => v + 1)
             setNewMessage(content)
         }
     }
@@ -178,14 +172,14 @@ const DMRoom = () => {
                 <MessageBubble
                     message={message}
                     isMe={message.sender_id === user?.id}
-                    profile={profiles[message.sender_id]}
+                    profile={profilesRef.current[message.sender_id]}
                     onProfileClick={(id) => navigate(`/profile/${id}`)}
                 />
             </div>
         )
-    }, [profiles, user, navigate])
+    }, [user, navigate, messageVersion])
 
-    const targetProfile = profiles[targetUserId]
+    const targetProfile = profilesRef.current[targetUserId]
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-white text-gray-900">
@@ -197,10 +191,10 @@ const DMRoom = () => {
                     </button>
 
                     {targetProfile ? (
-                        <div className="flex items-center gap-3" onClick={() => navigate(`/profile/${targetUserId}`)}>
-                            <AvatarRenderer
-                                profile={targetProfile}
-                                size="sm"
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`/profile/${targetUserId}`)}>
+                            <InitialsAvatar
+                                name={targetProfile.display_name || targetProfile.username}
+                                size={36}
                             />
                             <div>
                                 <div className="font-bold text-sm text-gray-900 leading-tight">
@@ -213,9 +207,9 @@ const DMRoom = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
-                            <div className="w-24 h-4 bg-gray-200 rounded animate-pulse" />
+                        <div className="flex items-center gap-3 animate-pulse">
+                            <div className="w-8 h-8 rounded-full bg-gray-200" />
+                            <div className="w-24 h-4 bg-gray-200 rounded" />
                         </div>
                     )}
                 </div>
@@ -227,16 +221,18 @@ const DMRoom = () => {
             {/* Messages Area */}
             <div className="flex-1 bg-gray-50">
                 {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    <div className="p-4 space-y-4">
+                        <SkeletonMessage />
+                        <SkeletonMessage isMe={true} />
+                        <SkeletonMessage />
                     </div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
                         style={{ height: '100%' }}
-                        data={messages}
+                        data={messagesRef.current}
                         firstItemIndex={firstItemIndex}
-                        initialTopMostItemIndex={messages.length - 1}
+                        initialTopMostItemIndex={messagesRef.current.length - 1}
                         startReached={loadMore}
                         itemContent={itemContent}
                         followOutput={'auto'}

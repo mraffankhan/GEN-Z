@@ -1,142 +1,219 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { MessageSquare, Search, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Loader2, MessageSquarePlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../context/UserContext'
-import AvatarRenderer from '../components/Avatar/AvatarRenderer'
+import { debounce } from 'lodash'
 
+// Components
+import RecentChatItem from '../components/dms/RecentChatItem'
+import SearchResultItem from '../components/dms/SearchResultItem'
+import SkeletonChatItem from '../components/skeletons/SkeletonChatItem'
+import PageHeader from '../components/PageHeader'
 
 const DMsPage = () => {
     const { user } = useUser()
     const navigate = useNavigate()
-    const [conversations, setConversations] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('')
 
-    useEffect(() => {
+    // State
+    const [recentChats, setRecentChats] = useState([])
+    const [searchResults, setSearchResults] = useState([])
+    const [searchQuery, setSearchQuery] = useState('')
+    const [loadingChats, setLoadingChats] = useState(true)
+    const [loadingSearch, setLoadingSearch] = useState(false)
+
+    // 1. Fetch Recent Chats
+    const fetchRecentChats = useCallback(async () => {
         if (!user) return
 
-        const fetchConversations = async () => {
-            setLoading(true)
-
-            // 1. Get all messages where I am sender or receiver
+        try {
+            // Fetch messages where I am sender or receiver
+            // Limit to 200 to get a good history without over-fetching
             const { data: messages, error } = await supabase
                 .from('direct_messages')
                 .select('sender_id, receiver_id, content, created_at, is_read')
                 .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
                 .order('created_at', { ascending: false })
+                .limit(200)
 
             if (messages) {
-                // 2. Extract unique user IDs I've chatted with
-                const userMap = new Map()
+                const chatMap = new Map()
 
                 messages.forEach(msg => {
                     const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
-                    if (!userMap.has(otherId)) {
-                        userMap.set(otherId, {
+
+                    // Only keep the latest message for each user
+                    if (!chatMap.has(otherId)) {
+                        chatMap.set(otherId, {
                             userId: otherId,
                             lastMessage: msg.content,
                             timestamp: msg.created_at,
-                            isRead: msg.is_read || msg.sender_id === user.id // Read if I sent it or marked read
+                            isRead: msg.is_read || msg.sender_id === user.id, // Read if I sent it
+                            isMe: msg.sender_id === user.id
                         })
                     }
                 })
 
-                const uniqueUserIds = Array.from(userMap.keys())
+                const uniqueUserIds = Array.from(chatMap.keys())
 
                 if (uniqueUserIds.length > 0) {
-                    // 3. Fetch profiles for these users
+                    // Fetch profiles
                     const { data: profiles } = await supabase
                         .from('profiles')
-                        .select('*')
+                        .select('id, username, display_name, avatar_url')
                         .in('id', uniqueUserIds)
 
                     if (profiles) {
-                        // Merge profile data with conversation data
-                        const fullConversations = uniqueUserIds.map(id => {
+                        const chats = uniqueUserIds.map(id => {
                             const profile = profiles.find(p => p.id === id)
-                            const conv = userMap.get(id)
-                            return { ...conv, profile }
-                        }).filter(c => c.profile) // Filter out if profile not found
+                            const chatData = chatMap.get(id)
+                            return { ...chatData, profile }
+                        }).filter(c => c.profile) // Ensure profile exists
 
-                        setConversations(fullConversations)
+                        setRecentChats(chats)
                     }
+                } else {
+                    setRecentChats([])
                 }
             }
-            setLoading(false)
+        } catch (error) {
+            console.error("Error fetching chats:", error)
+        } finally {
+            setLoadingChats(false)
         }
-
-        fetchConversations()
     }, [user])
 
-    const filteredConversations = conversations.filter(c =>
-        c.profile?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.profile?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    useEffect(() => {
+        fetchRecentChats()
+
+        // Realtime Subscription for new messages
+        if (!user) return
+
+        const channel = supabase
+            .channel('dms_list_updates')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'direct_messages',
+                filter: `receiver_id=eq.${user.id}`
+            }, () => {
+                // Refresh list on new message
+                fetchRecentChats()
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [user, fetchRecentChats])
+
+    // 2. Search Users (Debounced)
+    const performSearch = useCallback(
+        debounce(async (query) => {
+            if (!query.trim()) {
+                setSearchResults([])
+                setLoadingSearch(false)
+                return
+            }
+
+            setLoadingSearch(true)
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, username, display_name, avatar_url')
+                    .neq('id', user?.id) // Exclude self
+                    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+                    .limit(20)
+
+                if (data) setSearchResults(data)
+            } catch (error) {
+                console.error("Search error:", error)
+            } finally {
+                setLoadingSearch(false)
+            }
+        }, 300),
+        [user]
     )
+
+    useEffect(() => {
+        performSearch(searchQuery)
+        return () => performSearch.cancel()
+    }, [searchQuery, performSearch])
 
     return (
         <div className="min-h-screen bg-white text-gray-900 pb-20">
             {/* Header */}
-            <div className="px-4 py-6 bg-white sticky top-0 z-10">
-                <h1 className="text-2xl font-bold mb-4">Messages</h1>
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+                <div className="px-4 py-4">
+                    <h1 className="text-2xl font-bold tracking-tight mb-4">Messages</h1>
 
-                {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search messages..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-gray-100 text-gray-900 pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                    />
+                    {/* Search Bar */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search people..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-gray-100 text-gray-900 pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-500 text-[15px]"
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* List */}
-            <div className="px-4 space-y-2">
-                {loading ? (
-                    <div className="flex justify-center py-8">
-                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                    </div>
-                ) : filteredConversations.length > 0 ? (
-                    filteredConversations.map(conv => (
-                        <Link
-                            key={conv.userId}
-                            to={`/dms/${conv.userId}`}
-                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100"
-                        >
-                            <div className="relative">
-                                <AvatarRenderer
-                                    profile={conv.profile}
-                                    size="md"
-                                />
-                                {/* Online Status (Mock) */}
-                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-baseline mb-0.5">
-                                    <h3 className="font-bold text-sm text-gray-900 truncate">
-                                        {conv.profile.display_name || conv.profile.username}
-                                    </h3>
-                                    <span className="text-xs text-gray-400 flex-shrink-0">
-                                        {new Date(conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                </div>
-                                <p className={`text-sm truncate ${conv.isRead ? 'text-gray-500' : 'text-gray-900 font-semibold'}`}>
-                                    {conv.lastMessage}
-                                </p>
-                            </div>
-                        </Link>
-                    ))
-                ) : (
-                    <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <MessageSquare className="w-8 h-8 text-gray-400" />
+            {/* Content */}
+            <div className="bg-white">
+                {searchQuery.trim() ? (
+                    // Search Results
+                    <div>
+                        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Search Results</h2>
                         </div>
-                        <h3 className="font-bold text-gray-900 mb-1">No messages yet</h3>
-                        <p className="text-sm text-gray-500">Start a conversation from a profile!</p>
+                        {loadingSearch ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+                            </div>
+                        ) : searchResults.length > 0 ? (
+                            searchResults.map(profile => (
+                                <SearchResultItem
+                                    key={profile.id}
+                                    profile={profile}
+                                    onClick={() => navigate(`/dms/${profile.id}`)}
+                                />
+                            ))
+                        ) : (
+                            <div className="text-center py-10 text-gray-400">
+                                <p>No users found</p>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    // Recent Chats
+                    <div>
+                        {loadingChats ? (
+                            <>
+                                <SkeletonChatItem />
+                                <SkeletonChatItem />
+                                <SkeletonChatItem />
+                                <SkeletonChatItem />
+                            </>
+                        ) : recentChats.length > 0 ? (
+                            recentChats.map(chat => (
+                                <RecentChatItem
+                                    key={chat.userId}
+                                    conversation={chat}
+                                    onClick={() => navigate(`/dms/${chat.userId}`)}
+                                />
+                            ))
+                        ) : (
+                            <div className="text-center py-16 px-4">
+                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <MessageSquarePlus className="w-8 h-8 text-gray-300" />
+                                </div>
+                                <h3 className="font-bold text-gray-900 mb-1">No messages yet</h3>
+                                <p className="text-sm text-gray-500">Search for a user to start chatting!</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -1,107 +1,155 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, MapPin, DollarSign, Clock, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import BaseCard from '../../components/BaseCard'
-import BaseInput from '../../components/BaseInput'
-import PageHeader from '../../components/PageHeader'
+import { useUser } from '../../context/UserContext'
+import { debounce } from 'lodash'
+
+// Components
+import JobCard from '../../components/jobs/JobCard'
+import FilterBar from '../../components/jobs/FilterBar'
+import SearchBar from '../../components/jobs/SearchBar'
+import { JobSkeleton } from '../../components/jobs/JobSkeletons'
+
+// Filter Options
+const FILTER_CONFIG = [
+    {
+        id: 'role',
+        label: 'Role',
+        options: ['Developer', 'Designer', 'Marketing', 'Editor', 'Data Analyst', 'Business Intern', 'Product Intern']
+    },
+    {
+        id: 'type',
+        label: 'Type',
+        options: ['Internship', 'Part Time', 'Full Time', 'Remote', 'Hybrid', 'On-Site']
+    },
+    {
+        id: 'location',
+        label: 'Location',
+        options: ['Remote', 'India', 'Bangalore', 'Hyderabad', 'Delhi NCR', 'Mumbai', 'Pune', 'Chennai']
+    }
+]
 
 const OpportunitiesFeed = () => {
     const navigate = useNavigate()
+    const { user } = useUser()
+
     const [jobs, setJobs] = useState([])
     const [loading, setLoading] = useState(true)
-    const [searchTerm, setSearchTerm] = useState('')
+    const [searchQuery, setSearchQuery] = useState('')
 
+    // Filter State
+    const [activeFilters, setActiveFilters] = useState({
+        role: 'All',
+        type: 'All',
+        location: 'All'
+    })
+
+    // Fetch Jobs
     useEffect(() => {
         const fetchJobs = async () => {
-            const { data, error } = await supabase
-                .from('jobs')
-                .select('*')
-                .order('created_at', { ascending: false })
+            setLoading(true)
+            try {
+                const { data, error } = await supabase
+                    .from('jobs')
+                    .select('*')
+                    .order('created_at', { ascending: false })
 
-            if (data) setJobs(data)
-            setLoading(false)
+                if (data) setJobs(data)
+            } catch (error) {
+                console.error("Error fetching jobs:", error)
+            } finally {
+                setLoading(false)
+            }
         }
 
         fetchJobs()
     }, [])
 
-    const filteredJobs = jobs.filter(job =>
-        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
+    // Filter Logic
+    const filteredJobs = useMemo(() => {
+        return jobs.filter(job => {
+            // 1. Search Query (Title or Company)
+            const matchesSearch = searchQuery === '' ||
+                job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                job.company.toLowerCase().includes(searchQuery.toLowerCase())
+
+            // 2. Role Filter
+            const matchesRole = activeFilters.role === 'All' ||
+                job.title.toLowerCase().includes(activeFilters.role.toLowerCase()) ||
+                (job.tags && job.tags.some(tag => tag.toLowerCase().includes(activeFilters.role.toLowerCase())))
+
+            // 3. Type Filter
+            const matchesType = activeFilters.type === 'All' ||
+                job.type.toLowerCase() === activeFilters.type.toLowerCase()
+
+            // 4. Location Filter
+            const matchesLocation = activeFilters.location === 'All' ||
+                (activeFilters.location === 'India' ? true : job.location.toLowerCase().includes(activeFilters.location.toLowerCase()))
+
+            return matchesSearch && matchesRole && matchesType && matchesLocation
+        })
+    }, [jobs, searchQuery, activeFilters])
+
+    const handleFilterChange = (filterId, value) => {
+        setActiveFilters(prev => ({
+            ...prev,
+            [filterId]: value
+        }))
+    }
 
     return (
-        <div className="min-h-screen bg-bg text-text-primary px-4 pt-6 pb-24">
-            <PageHeader
-                title="Opportunities"
-                subtitle="Find your next internship or freelance gig."
-                showBack={false}
-            />
+        <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-28">
+            {/* Max Width Container */}
+            <div className="max-w-[600px] mx-auto bg-[#FAFAFA] min-h-screen">
 
-            <div className="mb-6">
-                <BaseInput
-                    icon={Search}
-                    placeholder="Search jobs, companies, or tags..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
-
-            {loading ? (
-                <div className="flex justify-center py-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                {/* Header & Search */}
+                <div className="px-4 pt-6 pb-2 bg-[#FAFAFA] sticky top-0 z-40">
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-4">Opportunities</h1>
+                    <SearchBar value={searchQuery} onChange={setSearchQuery} />
+                    <FilterBar
+                        filters={FILTER_CONFIG}
+                        activeFilters={activeFilters}
+                        onFilterChange={handleFilterChange}
+                    />
                 </div>
-            ) : (
-                <div className="space-y-4">
-                    {filteredJobs.map((job) => (
-                        <BaseCard
-                            key={job.id}
-                            onClick={() => navigate(`/opportunities/${job.id}`)}
-                            className="group hover:border-primary/30 transition-colors"
-                        >
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 className="font-semibold text-lg text-text-primary group-hover:text-primary transition-colors">{job.title}</h3>
-                                    <p className="text-text-secondary text-sm">{job.company}</p>
-                                </div>
-                                <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded text-text-secondary">{job.type}</span>
-                            </div>
 
-                            <div className="flex items-center gap-4 text-xs text-text-secondary mb-4">
-                                <div className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    <span>{job.location}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <DollarSign className="w-3 h-3" />
-                                    <span>{job.stipend}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{new Date(job.created_at).toLocaleDateString()}</span>
-                                </div>
+                <div className="flex flex-col gap-4 px-4 pt-4">
+                    {/* Jobs List */}
+                    {loading ? (
+                        <>
+                            <JobSkeleton />
+                            <JobSkeleton />
+                            <JobSkeleton />
+                            <JobSkeleton />
+                        </>
+                    ) : filteredJobs.length > 0 ? (
+                        filteredJobs.map(job => (
+                            <JobCard
+                                key={job.id}
+                                job={job}
+                                onClick={() => navigate(`/opportunities/${job.id}`)}
+                            />
+                        ))
+                    ) : (
+                        <div className="py-12 text-center">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-2xl text-gray-400">🔍</span>
                             </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                {job.tags?.map((tag, index) => (
-                                    <span key={index} className="text-[10px] px-2 py-1 rounded-full bg-primary/5 text-primary border border-primary/10">
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                        </BaseCard>
-                    ))}
-
-                    {filteredJobs.length === 0 && (
-                        <div className="text-center py-10 text-text-subtle">
-                            <Briefcase className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                            <p>No opportunities found.</p>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">No jobs found</h3>
+                            <p className="text-sm text-gray-500">Try adjusting your filters or search query</p>
+                            <button
+                                onClick={() => {
+                                    setSearchQuery('')
+                                    setActiveFilters({ role: 'All', type: 'All', location: 'All' })
+                                }}
+                                className="mt-4 text-sm font-semibold text-neon-purple hover:text-purple-700"
+                            >
+                                Clear all filters
+                            </button>
                         </div>
                     )}
                 </div>
-            )}
+            </div>
         </div>
     )
 }

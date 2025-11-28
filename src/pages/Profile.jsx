@@ -1,76 +1,97 @@
-import React from 'react'
-import { Edit } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, MoreHorizontal } from 'lucide-react'
 import { useUser } from '../context/UserContext'
+import { supabase } from '../lib/supabase'
 
-import LogoutButton from '../components/LogoutButton'
-import BaseCard from '../components/BaseCard'
-import BaseButton from '../components/BaseButton'
-import AvatarRenderer from '../components/Avatar/AvatarRenderer'
+// Components
+import ProfileHeader from '../components/profile/ProfileHeader'
+import DetailsCard from '../components/profile/DetailsCard'
+import ActionRow from '../components/profile/ActionRow'
+import EditProfileModal from '../components/profile/EditProfileModal'
+import MoreMenu from '../components/profile/MoreMenu'
 
 const Profile = () => {
-    const { user, profile, loading } = useUser()
+    const { user, profile, loading, refreshProfile } = useUser()
+    const navigate = useNavigate()
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-    if (loading) return <div className="min-h-screen bg-bg text-text-primary flex items-center justify-center">Loading Profile...</div>
-    if (!profile) return <div className="min-h-screen bg-bg text-text-primary flex items-center justify-center">Profile not found</div>
+    const handleLogout = async () => {
+        try {
+            await supabase.auth.signOut()
+            navigate('/login')
+        } catch (error) {
+            console.error('Error logging out:', error)
+        }
+    }
 
-    const {
-        display_name,
-        bio
-    } = profile
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: 'Check out my profile!',
+                url: window.location.href
+            }).catch(console.error)
+        } else {
+            // Fallback
+            navigator.clipboard.writeText(window.location.href)
+            alert('Profile link copied to clipboard!')
+        }
+    }
+
+    if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>
+    if (!profile) return <div className="min-h-screen bg-white flex items-center justify-center">Profile not found</div>
 
     return (
-        <div className="min-h-screen bg-bg text-text-primary p-4 pb-24">
-            <div className="max-w-md mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex justify-between items-center">
-                    <h1 className="text-2xl font-semibold text-primary tracking-tight">My Profile</h1>
-                </div>
+        <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-24">
 
-                {/* Avatar & Info Card */}
-                <BaseCard className="text-center bg-white">
-                    <div className="flex flex-col items-center mb-6">
-                        {/* Avatar */}
-                        <div className="mb-4">
-                            <AvatarRenderer
-                                profile={profile}
-                                size="2xl"
-                            />
-                        </div>
+            {/* 1. Ultra-minimal Top Bar */}
+            <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-md px-4 py-3 flex justify-between items-center">
+                <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <ArrowLeft className="w-6 h-6 text-gray-900" />
+                </button>
+                <button
+                    onClick={() => setIsMenuOpen(true)}
+                    className="p-2 -mr-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                    <MoreHorizontal className="w-6 h-6 text-gray-900" />
+                </button>
+            </div>
 
-                        {/* Name & Email */}
-                        <h2 className="text-2xl font-bold text-text-primary mb-1">
-                            {display_name || 'Set your name'}
-                        </h2>
-                        <p className="text-sm text-text-secondary mb-3">{user?.email}</p>
+            <div className="max-w-md mx-auto px-4 space-y-8 pt-2">
 
-                        {/* Bio */}
-                        {bio && (
-                            <p className="text-sm text-text-secondary max-w-xs">{bio}</p>
-                        )}
-                    </div>
+                {/* 2. Centered Profile Header */}
+                <div className="space-y-6">
+                    <ProfileHeader profile={profile} />
 
                     {/* Action Buttons */}
-                    <div className="w-full">
-                        <Link to="/profile/edit" className="w-full">
-                            <BaseButton variant="secondary" fullWidth className="text-sm py-2.5">
-                                <Edit className="w-4 h-4" />
-                                Edit Profile
-                            </BaseButton>
-                        </Link>
-                    </div>
-                </BaseCard>
+                    <ActionRow
+                        isMe={true}
+                        onEdit={() => setIsEditModalOpen(true)}
+                    />
+                </div>
 
-                {/* Logout Button */}
-                <LogoutButton />
+                {/* 3. Details Card (About + Interests) */}
+                <DetailsCard profile={profile} />
 
-                {/* Back to Home */}
-                <Link
-                    to="/"
-                    className="block w-full text-center py-3 text-text-secondary hover:text-text-primary transition-colors text-sm font-medium"
-                >
-                    Back to Home
-                </Link>
+                {/* Edit Modal */}
+                <EditProfileModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    profile={profile}
+                    onUpdate={refreshProfile}
+                />
+
+                {/* More Menu (Bottom Sheet) */}
+                <MoreMenu
+                    isOpen={isMenuOpen}
+                    onClose={() => setIsMenuOpen(false)}
+                    isMe={true}
+                    onEdit={() => setIsEditModalOpen(true)}
+                    onLogout={handleLogout}
+                    onShare={handleShare}
+                />
+
             </div>
         </div>
     )

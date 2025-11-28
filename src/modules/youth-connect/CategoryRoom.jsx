@@ -1,72 +1,121 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, Info, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Info } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useUser } from '../../context/UserContext'
 import { Virtuoso } from 'react-virtuoso'
 import MessageBubble from './MessageBubble'
-import AvatarRenderer from '../../components/Avatar/AvatarRenderer'
+import CategoryTabs from './CategoryTabs'
+import SkeletonMessage from '../../components/skeletons/SkeletonMessage'
+import { getCategoryMessages, getOlderCategoryMessages, fetchProfilesBatch, sendCategoryMessage } from '../../lib/queries/messages'
+
+// --- Memoized Header ---
+const Header = memo(({ categoryName, onBack, onInfo }) => (
+    <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm h-[60px]">
+        <div className="flex items-center gap-3">
+            <button onClick={onBack} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
+                <ArrowLeft className="w-6 h-6 text-black" />
+            </button>
+            <div>
+                <h2 className="font-bold text-lg text-black leading-tight">{categoryName}</h2>
+                <div className="flex items-center gap-1.5 text-xs text-neon-green font-medium">
+                    <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
+                    <span>Online</span>
+                </div>
+            </div>
+        </div>
+        <button onClick={onInfo} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+            <Info className="w-6 h-6 text-gray-500" />
+        </button>
+    </div>
+))
+Header.displayName = 'Header'
+
+// --- Memoized Input Bar ---
+const InputBar = memo(({ value, onChange, onSubmit, disabled }) => (
+    <form onSubmit={onSubmit} className="p-3 bg-white border-t border-gray-100 pb-safe">
+        <div className="flex items-center gap-2">
+            <input
+                type="text"
+                value={value}
+                onChange={onChange}
+                placeholder="Type a message..."
+                className="flex-grow bg-[#F8F8FA] text-black px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all placeholder-gray-400 text-base border border-gray-100"
+                autoFocus
+            />
+            <button
+                type="submit"
+                disabled={disabled}
+                className="p-3 bg-neon-green rounded-xl text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-400 shadow-md shadow-green-200 transition-all active:scale-95 flex-shrink-0"
+            >
+                <Send className="w-5 h-5" />
+            </button>
+        </div>
+    </form>
+))
+InputBar.displayName = 'InputBar'
 
 const CategoryRoom = () => {
     const { categoryId } = useParams()
     const navigate = useNavigate()
     const { user } = useUser()
 
-    const [messages, setMessages] = useState([])
-    const [profiles, setProfiles] = useState({}) // Cache: { userId: profileData }
+    // Refs
+    const messagesRef = useRef([])
+    const profilesRef = useRef({})
+    const channelRef = useRef(null)
+    const virtuosoRef = useRef(null)
+
+    // State
+    const [messageVersion, setMessageVersion] = useState(0)
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
-    const [firstItemIndex, setFirstItemIndex] = useState(10000) // Start high for prepend support
-
-    const virtuosoRef = useRef(null)
-    const subscriptionRef = useRef(null)
+    const [firstItemIndex, setFirstItemIndex] = useState(10000)
 
     const categoryName = categoryId?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
-    // 1. Profile Caching Helper
+    // Stable profile resolution
     const resolveProfiles = useCallback(async (userIds) => {
-        const missingIds = userIds.filter(id => !profiles[id])
+        const missingIds = userIds.filter(id => !profilesRef.current[id])
         if (missingIds.length === 0) return
 
-        const { data } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url, display_name')
-            .in('id', missingIds)
-
+        const { data } = await fetchProfilesBatch(missingIds)
         if (data) {
-            setProfiles(prev => {
-                const newProfiles = { ...prev }
-                data.forEach(p => newProfiles[p.id] = p)
-                return newProfiles
-            })
+            Object.assign(profilesRef.current, data)
         }
-    }, [profiles])
+    }, [])
 
-    // 2. Initial Fetch
+    // Initial fetch
     useEffect(() => {
+        if (!categoryId) return
+
         const fetchInitialMessages = async () => {
             setLoading(true)
-            const { data, error } = await supabase
-                .from('category_messages')
-                .select('*') // No joins!
-                .eq('room_id', categoryId)
-                .order('created_at', { ascending: false })
-                .limit(50)
+            const { data, error } = await getCategoryMessages(categoryId, 30)
 
-            if (data) {
-                const reversed = data.reverse()
-                setMessages(reversed)
-
-                // Extract User IDs and fetch profiles
-                const userIds = [...new Set(reversed.map(m => m.sender_id))]
-                resolveProfiles(userIds)
+            if (data && !error) {
+                messagesRef.current = data
+                const userIds = [...new Set(data.map(m => m.sender_id))]
+                await resolveProfiles(userIds)
+                setMessageVersion(v => v + 1)
             }
             setLoading(false)
         }
 
         fetchInitialMessages()
+    }, [categoryId, resolveProfiles])
 
-        // 3. Realtime Subscription (One listener only)
+    // WebSocket
+    useEffect(() => {
+        if (!categoryId || !user) return
+
+        const handleNewMessage = async (payload) => {
+            const newMsg = payload.new
+            messagesRef.current = [...messagesRef.current, newMsg]
+            await resolveProfiles([newMsg.sender_id])
+            setMessageVersion(v => v + 1)
+        }
+
         const channel = supabase
             .channel(`room:${categoryId}`)
             .on('postgres_changes', {
@@ -74,56 +123,50 @@ const CategoryRoom = () => {
                 schema: 'public',
                 table: 'category_messages',
                 filter: `room_id=eq.${categoryId}`
-            }, (payload) => {
-                const newMsg = payload.new
-                setMessages(prev => [...prev, newMsg])
-
-                // Check if we need to fetch this user's profile
-                resolveProfiles([newMsg.sender_id])
-            })
+            }, handleNewMessage)
             .subscribe()
 
-        subscriptionRef.current = channel
+        channelRef.current = channel
 
         return () => {
-            supabase.removeChannel(channel)
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current)
+                channelRef.current = null
+            }
         }
-    }, [categoryId, resolveProfiles])
+    }, [categoryId, user, resolveProfiles])
 
-    // 4. Load More (Prepend)
+    // Load more
     const loadMore = useCallback(async () => {
-        const oldestMessage = messages[0]
-        if (!oldestMessage) return
+        const messages = messagesRef.current
+        if (messages.length === 0) return
 
-        const { data } = await supabase
-            .from('category_messages')
-            .select('*')
-            .eq('room_id', categoryId)
-            .lt('created_at', oldestMessage.created_at)
-            .order('created_at', { ascending: false })
-            .limit(50)
+        const oldestMessage = messages[0]
+        const { data } = await getOlderCategoryMessages(
+            categoryId,
+            oldestMessage.created_at,
+            30
+        )
 
         if (data && data.length > 0) {
-            const reversed = data.reverse()
-            const userIds = [...new Set(reversed.map(m => m.sender_id))]
-            resolveProfiles(userIds)
-
-            // Prepend messages and adjust index to maintain position
-            setFirstItemIndex(prev => prev - reversed.length)
-            setMessages(prev => [...reversed, ...prev])
-            return reversed.length
+            const userIds = [...new Set(data.map(m => m.sender_id))]
+            await resolveProfiles(userIds)
+            messagesRef.current = [...data, ...messages]
+            setFirstItemIndex(prev => prev - data.length)
+            setMessageVersion(v => v + 1)
+            return data.length
         }
         return 0
-    }, [messages, categoryId, resolveProfiles])
+    }, [categoryId, resolveProfiles])
 
-    const handleSendMessage = async (e) => {
+    // Send message
+    const handleSendMessage = useCallback(async (e) => {
         e.preventDefault()
         if (!newMessage.trim() || !user) return
 
         const content = newMessage.trim()
-        setNewMessage('') // Optimistic clear
+        setNewMessage('')
 
-        // Optimistic UI Update (Optional, but makes it feel instant)
         const optimisticMsg = {
             id: `temp-${Date.now()}`,
             room_id: categoryId,
@@ -131,80 +174,71 @@ const CategoryRoom = () => {
             content: content,
             created_at: new Date().toISOString()
         }
-        setMessages(prev => [...prev, optimisticMsg])
 
-        const { error } = await supabase
-            .from('category_messages')
-            .insert([
-                {
-                    room_id: categoryId,
-                    sender_id: user.id,
-                    content: content,
-                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
-                }
-            ])
+        messagesRef.current = [...messagesRef.current, optimisticMsg]
+        setMessageVersion(v => v + 1)
+
+        const { error } = await sendCategoryMessage(categoryId, user.id, content)
 
         if (error) {
             console.error("Failed to send:", error)
-            setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id)) // Revert on error
+            messagesRef.current = messagesRef.current.filter(m => m.id !== optimisticMsg.id)
+            setMessageVersion(v => v + 1)
             setNewMessage(content)
         }
-    }
+    }, [newMessage, user, categoryId])
 
-    // Memoize item content for Virtuoso
+    // Item Content
     const itemContent = useCallback((index, message) => {
         return (
             <div className="px-4 py-1">
                 <MessageBubble
                     message={message}
                     isMe={message.sender_id === user?.id}
-                    profile={profiles[message.sender_id]}
+                    profile={profilesRef.current[message.sender_id]}
                     onProfileClick={(id) => navigate(`/profile/${id}`)}
                 />
             </div>
         )
-    }, [profiles, user, navigate])
+    }, [user, navigate, messageVersion])
 
-    // Get current user profile for header
-    const userProfile = profiles[user?.id] || user?.user_metadata || {}
+    // Handlers
+    const handleBack = useCallback(() => navigate('/youth-connect'), [navigate])
+    const handleInfo = useCallback(() => navigate(`/youth-connect/info/${categoryId}`), [navigate, categoryId])
+    const handleInputChange = useCallback((e) => setNewMessage(e.target.value), [])
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-white text-black">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm z-20">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => navigate('/youth-connect')} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
-                        <ArrowLeft className="w-6 h-6 text-black" />
-                    </button>
-                    <div>
-                        <h2 className="font-bold text-lg text-black leading-tight">{categoryName}</h2>
-                        <div className="flex items-center gap-1.5 text-xs text-neon-green font-medium">
-                            <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
-                            <span>Online</span>
-                        </div>
-                    </div>
-                </div>
-                <button onClick={() => navigate(`/youth-connect/info/${categoryId}`)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-                    <Info className="w-6 h-6 text-gray-500" />
-                </button>
+        <div className="flex flex-col h-full fixed inset-0 bg-white">
+
+            {/* FIXED TOP BAR */}
+            <div className="sticky top-0 z-50 bg-white">
+                <Header
+                    categoryName={categoryName}
+                    onBack={handleBack}
+                    onInfo={handleInfo}
+                />
             </div>
 
-            {/* Messages Area (Virtualized) */}
-            <div
-                className="flex-1 bg-[#F8F8FA]"
-                style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/subtle-white-feathers.png")' }}
-            >
+            {/* FIXED CATEGORY TABS BELOW HEADER */}
+            <div className="sticky top-[50px] z-40 bg-white border-b border-gray-100">
+                <CategoryTabs />
+            </div>
+
+            {/* SCROLL ONLY THIS AREA */}
+            <div className="flex-1 overflow-y-auto bg-[#F8F8FA]">
                 {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
+                    <div className="p-4 space-y-4">
+                        <SkeletonMessage />
+                        <SkeletonMessage isMe={true} />
+                        <SkeletonMessage />
                     </div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
                         style={{ height: '100%' }}
-                        data={messages}
+                        data={messagesRef.current}
                         firstItemIndex={firstItemIndex}
-                        initialTopMostItemIndex={messages.length - 1}
+                        initialTopMostItemIndex={messagesRef.current.length - 1}
                         startReached={loadMore}
                         itemContent={itemContent}
                         followOutput={'auto'}
@@ -213,26 +247,16 @@ const CategoryRoom = () => {
                 )}
             </div>
 
-            {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-100 pb-safe z-20">
-                <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-grow bg-[#F8F8FA] text-black px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all placeholder-gray-400 text-base border border-gray-100"
-                        autoFocus
-                    />
-                    <button
-                        type="submit"
-                        disabled={!newMessage.trim()}
-                        className="p-3 bg-neon-green rounded-xl text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-400 shadow-md shadow-green-200 transition-all active:scale-95 flex-shrink-0"
-                    >
-                        <Send className="w-5 h-5" />
-                    </button>
-                </div>
-            </form>
+            {/* FIXED BOTTOM INPUT */}
+            <div className="sticky bottom-0 z-40 bg-white">
+                <InputBar
+                    value={newMessage}
+                    onChange={handleInputChange}
+                    onSubmit={handleSendMessage}
+                    disabled={!newMessage.trim()}
+                />
+            </div>
+
         </div>
     )
 }
