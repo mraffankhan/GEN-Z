@@ -27,8 +27,7 @@ export const UserProvider = ({ children }) => {
                     id: userId,
                     email: userEmail,
 
-                    trust_score: 500,
-                    coins: 0,
+
                     created_at: new Date().toISOString()
                 }
 

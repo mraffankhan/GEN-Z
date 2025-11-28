@@ -1,9 +1,8 @@
 import React from 'react'
-import CosmeticAvatar from './CosmeticAvatar'
 
 /**
  * Unified Avatar Renderer
- * Pass the full profile object and it handles the rest.
+ * Simple circle avatar.
  */
 const AvatarRenderer = ({
     profile,
@@ -11,27 +10,24 @@ const AvatarRenderer = ({
     className = '',
     onClick
 }) => {
-    if (!profile) {
-        return (
-            <CosmeticAvatar
-                src={null}
-                alt="User"
-                size={size}
-                className={className}
-            />
-        )
+    const sizeClasses = {
+        xs: 'w-6 h-6',
+        sm: 'w-8 h-8',
+        md: 'w-10 h-10',
+        lg: 'w-16 h-16',
+        xl: 'w-24 h-24',
+        '2xl': 'w-32 h-32'
     }
 
-    return (
-        <CosmeticAvatar
-            src={profile.avatar_url}
-            alt={profile.username || profile.display_name}
-            size={size}
-            activeBadge={profile.active_badge}
-            activeBorder={profile.active_border}
-            cosmetics={profile.cosmetics || {}}
+    const currentSize = sizeClasses[size] || sizeClasses.md
+    const src = profile?.avatar_url || 'https://via.placeholder.com/150'
+    const alt = profile?.username || profile?.display_name || 'User'
 
-            className={className}
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={`rounded-full object-cover ${currentSize} ${className}`}
             onClick={onClick}
         />
     )

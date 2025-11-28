@@ -1,13 +1,12 @@
 import React from 'react'
-import { ShoppingBag, Edit } from 'lucide-react'
+import { Edit } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../context/UserContext'
-import ProfileStats from '../components/ProfileStats'
+
 import LogoutButton from '../components/LogoutButton'
 import BaseCard from '../components/BaseCard'
 import BaseButton from '../components/BaseButton'
 import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import CosmeticName from '../components/Text/CosmeticName'
 
 const Profile = () => {
     const { user, profile, loading } = useUser()
@@ -17,11 +16,7 @@ const Profile = () => {
 
     const {
         display_name,
-        trust_score = 500,
-        coins = 0,
-        active_badge,
-        bio,
-        cosmetics = {}
+        bio
     } = profile
 
     return (
@@ -30,9 +25,6 @@ const Profile = () => {
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <h1 className="text-2xl font-semibold text-primary tracking-tight">My Profile</h1>
-                    <Link to="/store" className="p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 transition-colors text-primary shadow-sm">
-                        <ShoppingBag className="w-5 h-5" />
-                    </Link>
                 </div>
 
                 {/* Avatar & Info Card */}
@@ -48,10 +40,7 @@ const Profile = () => {
 
                         {/* Name & Email */}
                         <h2 className="text-2xl font-bold text-text-primary mb-1">
-                            <CosmeticName
-                                name={display_name || 'Set your name'}
-                                cosmetics={cosmetics}
-                            />
+                            {display_name || 'Set your name'}
                         </h2>
                         <p className="text-sm text-text-secondary mb-3">{user?.email}</p>
 
@@ -62,24 +51,15 @@ const Profile = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="w-full">
                         <Link to="/profile/edit" className="w-full">
                             <BaseButton variant="secondary" fullWidth className="text-sm py-2.5">
                                 <Edit className="w-4 h-4" />
                                 Edit Profile
                             </BaseButton>
                         </Link>
-                        <Link to="/profile/customize" className="w-full">
-                            <BaseButton variant="outline" fullWidth className="text-sm py-2.5">
-                                <ShoppingBag className="w-4 h-4" />
-                                Customize
-                            </BaseButton>
-                        </Link>
                     </div>
                 </BaseCard>
-
-                {/* Stats */}
-                <ProfileStats trustScore={trust_score} coins={coins} />
 
                 {/* Logout Button */}
                 <LogoutButton />

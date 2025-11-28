@@ -1,149 +1,170 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import {
-  Users,
-  MessageSquare,
-  Briefcase,
-  Code,
-  PenTool,
-  Gamepad2,
-  Megaphone,
-  ArrowRight,
-  Zap,
-  Loader2,
-  Sparkles
-} from 'lucide-react'
-import { useUser } from '../context/UserContext'
+import { useNavigate } from 'react-router-dom'
+import { Code, PenTool, Video, Palette, TrendingUp, Briefcase, Music, Gamepad2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import CosmeticName from '../components/Text/CosmeticName'
+import { useUser } from '../context/UserContext'
+
+// Components
+import HomeHeader from '../components/home/HomeHeader'
+import OpportunityCard from '../components/home/OpportunityCard'
+import ConnectCard from '../components/home/ConnectCard'
+import AdBanner from '../components/home/AdBanner'
+
+// Categories Data (Cleaned up colors for minimal look - passing accentColor class instead)
+const categories = [
+  { id: 'developer', name: 'Developer', icon: Code, accentColor: 'bg-blue-500' },
+  { id: 'ui-ux', name: 'UI/UX', icon: PenTool, accentColor: 'bg-purple-500' },
+  { id: 'video-editor', name: 'Editor', icon: Video, accentColor: 'bg-red-500' },
+  { id: 'graphic-designer', name: 'Designer', icon: Palette, accentColor: 'bg-pink-500' },
+  { id: 'marketing', name: 'Marketing', icon: TrendingUp, accentColor: 'bg-green-500' },
+  { id: 'business', name: 'Business', icon: Briefcase, accentColor: 'bg-indigo-500' },
+  { id: 'music-art', name: 'Art', icon: Music, accentColor: 'bg-cyan-500' },
+  { id: 'gaming', name: 'Gaming', icon: Gamepad2, accentColor: 'bg-orange-500' },
+]
 
 const Home = () => {
-  const { profile, loading: userLoading } = useUser()
+  const { user } = useUser()
   const navigate = useNavigate()
+
+  const [jobs, setJobs] = useState([])
   const [ads, setAds] = useState([])
-  const [loadingAds, setLoadingAds] = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchAds = async () => {
-      const { data } = await supabase
-        .from('ads')
-        .select('*')
-        .eq('active', true)
-        .order('created_at', { ascending: false })
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        // 1. Fetch Jobs (Limit 3)
+        const { data: jobsData } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(3)
 
-      if (data) setAds(data)
-      setLoadingAds(false)
+        if (jobsData) setJobs(jobsData)
+
+        // 2. Fetch Ads
+        const { data: adsData } = await supabase
+          .from('ads')
+          .select('*')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+
+        if (adsData) setAds(adsData)
+
+      } catch (error) {
+        console.error("Error fetching home data:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    fetchAds()
-  }, [])
+    fetchData()
+  }, [user])
 
-  if (userLoading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
+  // Skeletons
+  const OpportunitySkeleton = () => (
+    <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] w-full border border-transparent">
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex-1 pr-4 space-y-2">
+          <div className="h-5 bg-gray-100 rounded w-3/4 animate-pulse" />
+          <div className="h-3 bg-gray-50 rounded w-1/2 animate-pulse" />
+        </div>
+        <div className="w-8 h-8 rounded-full bg-gray-50 animate-pulse" />
       </div>
-    )
-  }
+      <div className="mt-4 flex gap-2">
+        <div className="h-6 w-16 bg-gray-50 rounded-lg animate-pulse" />
+        <div className="h-6 w-24 bg-gray-50 rounded-lg animate-pulse" />
+      </div>
+    </div>
+  )
+
+  const ConnectSkeleton = () => (
+    <div className="w-28 h-32 flex-shrink-0 bg-white rounded-[24px] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center gap-3 animate-pulse border border-transparent">
+      <div className="w-8 h-8 bg-gray-50 rounded-full" />
+      <div className="w-16 h-3 bg-gray-50 rounded" />
+    </div>
+  )
+
+  const AdSkeleton = () => (
+    <div className="w-full aspect-video bg-gray-100 rounded-[24px] animate-pulse" />
+  )
 
   return (
-    <div className="min-h-screen bg-white text-black pb-24 overflow-x-hidden">
-      {/* 1. Header & Branding */}
-      <div className="px-6 pt-10 pb-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-cyber font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-blue-600 tracking-tighter drop-shadow-sm">
-            GEN-Z CONNECT
-          </h1>
-          <p className="text-gray-500 text-xs font-medium tracking-wide mt-1">
-            Your Space. Your People. Your Vibe.
-          </p>
-        </div>
-        <Link to="/profile" className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-neon-purple to-blue-500 rounded-full opacity-20 group-hover:opacity-50 blur transition duration-200"></div>
-          <div className="relative">
-            <AvatarRenderer
-              profile={profile}
-              size="md"
-            />
-          </div>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-28">
+      {/* Max Width Container for Desktop */}
+      <div className="max-w-[600px] mx-auto bg-[#FAFAFA] min-h-screen">
 
-      <div className="px-4 space-y-8">
-        {/* 2. Quick Access Row */}
-        <div className="grid grid-cols-3 gap-4">
-          <Link to="/youth-connect" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-neon-purple/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
-            <div className="absolute inset-0 bg-neon-purple/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="flex flex-col items-center justify-center relative z-10">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-neon-purple/30 shadow-sm">
-                <Users className="w-6 h-6 text-neon-purple" />
-              </div>
-              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Connect</span>
+        {/* 1. Header */}
+        <HomeHeader />
+
+        <div className="flex flex-col gap-8 px-4 pt-2">
+
+          {/* 2. Opportunities Section */}
+          <section>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Opportunities For You</h2>
             </div>
-          </Link>
-
-          <Link to="/dms" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-blue-500/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
-            <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="flex flex-col items-center justify-center relative z-10">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-blue-500/30 shadow-sm">
-                <MessageSquare className="w-6 h-6 text-blue-500" />
-              </div>
-              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Chats</span>
-            </div>
-          </Link>
-
-          <Link to="/opportunities" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-neon-green/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
-            <div className="absolute inset-0 bg-neon-green/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="flex flex-col items-center justify-center relative z-10">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-neon-green/30 shadow-sm">
-                <Briefcase className="w-6 h-6 text-neon-green" />
-              </div>
-              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Gigs</span>
-            </div>
-          </Link>
-        </div>
-
-        {/* 3. Gen-Z Ads Section (Replaces Trending) */}
-        <div>
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <Zap className="w-4 h-4 text-neon-purple fill-current" />
-            <h2 className="text-lg font-bold text-black tracking-tight">Gen-Z Ads</h2>
-          </div>
-
-          <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide snap-x">
-            {loadingAds ? (
-              [1, 2].map(i => (
-                <div key={i} className="snap-center flex-shrink-0 w-64 h-32 bg-gray-50 rounded-2xl animate-pulse border border-gray-100" />
-              ))
-            ) : ads.length > 0 ? (
-              ads.map(ad => (
-                <a
-                  key={ad.id}
-                  href={ad.redirect_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="snap-center flex-shrink-0 w-64 h-32 relative rounded-2xl overflow-hidden group border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300"
-                >
-                  <img
-                    src={ad.image_url}
-                    alt={ad.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            <div className="flex flex-col gap-4">
+              {loading ? (
+                <>
+                  <OpportunitySkeleton />
+                  <OpportunitySkeleton />
+                </>
+              ) : jobs.length > 0 ? (
+                jobs.map(job => (
+                  <OpportunityCard
+                    key={job.id}
+                    job={job}
+                    onClick={() => navigate(`/opportunities/${job.id}`)}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                    <span className="text-white font-bold text-sm">{ad.title}</span>
-                  </div>
-                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] font-bold text-black border border-gray-100">
-                    AD
-                  </div>
-                </a>
-              ))
-            ) : (
-              <div className="w-full text-center py-8 bg-[#F8F8FA] rounded-2xl border border-dashed border-gray-200">
-                <p className="text-sm text-gray-400">No active promotions</p>
-              </div>
-            )}
-          </div>
+                ))
+              ) : (
+                <div className="p-8 text-center bg-white rounded-[24px] shadow-sm border border-transparent">
+                  <p className="text-sm text-gray-400 font-medium">No active opportunities</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* 3. Youth Connect Section */}
+          <section>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Youth Connect</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide snap-x">
+              {loading ? (
+                <>
+                  <ConnectSkeleton />
+                  <ConnectSkeleton />
+                  <ConnectSkeleton />
+                  <ConnectSkeleton />
+                </>
+              ) : (
+                categories.map(cat => (
+                  <ConnectCard
+                    key={cat.id}
+                    category={cat}
+                    onClick={() => navigate(`/youth-connect/room/${cat.id}`)}
+                  />
+                ))
+              )}
+            </div>
+          </section>
+
+          {/* 4. Ads Section */}
+          <section>
+            <div className="flex flex-col gap-6">
+              {loading ? (
+                <AdSkeleton />
+              ) : ads.length > 0 ? (
+                ads.map(ad => (
+                  <AdBanner key={ad.id} ad={ad} />
+                ))
+              ) : null}
+            </div>
+          </section>
+
         </div>
       </div>
     </div>

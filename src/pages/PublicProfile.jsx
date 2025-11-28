@@ -7,7 +7,7 @@ import BaseButton from '../components/BaseButton'
 import PageHeader from '../components/PageHeader'
 import { useUser } from '../context/UserContext'
 import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import CosmeticName from '../components/Text/CosmeticName'
+
 
 const PublicProfile = () => {
     const { userId } = useParams()
@@ -74,10 +74,7 @@ const PublicProfile = () => {
                         />
                     </div>
                     <h1 className="text-2xl font-bold text-text-primary">
-                        <CosmeticName
-                            name={profile.display_name || profile.username || 'Anonymous'}
-                            cosmetics={profile.cosmetics || {}}
-                        />
+                        {profile.display_name || profile.username || 'Anonymous'}
                     </h1>
                     <p className="text-text-secondary">@{profile.username || 'user'}</p>
                     {profile.bio && (
@@ -97,17 +94,7 @@ const PublicProfile = () => {
                     )}
                 </div>
 
-                {/* Stats / Info */}
-                <div className="grid grid-cols-2 gap-4">
-                    <BaseCard className="text-center py-4">
-                        <div className="text-2xl font-bold text-primary">{profile.trust_score || 500}</div>
-                        <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold">Trust Score</div>
-                    </BaseCard>
-                    <BaseCard className="text-center py-4">
-                        <div className="text-2xl font-bold text-primary">{profile.coins || 0}</div>
-                        <div className="text-xs text-text-secondary uppercase tracking-wider font-semibold">Coins</div>
-                    </BaseCard>
-                </div>
+
 
                 {/* Details */}
                 <BaseCard className="space-y-4">

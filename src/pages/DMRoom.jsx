@@ -6,7 +6,7 @@ import { useUser } from '../context/UserContext'
 import { Virtuoso } from 'react-virtuoso'
 import MessageBubble from '../modules/youth-connect/MessageBubble'
 import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import CosmeticName from '../components/Text/CosmeticName'
+
 
 const DMRoom = () => {
     const { userId: targetUserId } = useParams()
@@ -50,7 +50,7 @@ const DMRoom = () => {
 
         const { data } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, display_name, active_badge, active_border, cosmetics')
+            .select('id, username, avatar_url, display_name')
             .in('id', missingIds)
 
         if (data) {
@@ -204,10 +204,7 @@ const DMRoom = () => {
                             />
                             <div>
                                 <div className="font-bold text-sm text-gray-900 leading-tight">
-                                    <CosmeticName
-                                        name={targetProfile.display_name || targetProfile.username}
-                                        cosmetics={targetProfile.cosmetics || {}}
-                                    />
+                                    {targetProfile.display_name || targetProfile.username}
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs text-green-500 font-medium">
                                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>

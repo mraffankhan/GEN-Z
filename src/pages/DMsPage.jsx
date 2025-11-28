@@ -4,7 +4,7 @@ import { MessageSquare, Search, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../context/UserContext'
 import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import CosmeticName from '../components/Text/CosmeticName'
+
 
 const DMsPage = () => {
     const { user } = useUser()
@@ -118,10 +118,7 @@ const DMsPage = () => {
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline mb-0.5">
                                     <h3 className="font-bold text-sm text-gray-900 truncate">
-                                        <CosmeticName
-                                            name={conv.profile.display_name || conv.profile.username}
-                                            cosmetics={conv.profile.cosmetics || {}}
-                                        />
+                                        {conv.profile.display_name || conv.profile.username}
                                     </h3>
                                     <span className="text-xs text-gray-400 flex-shrink-0">
                                         {new Date(conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

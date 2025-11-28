@@ -30,7 +30,7 @@ const CategoryRoom = () => {
 
         const { data } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, display_name, active_badge, active_border, cosmetics')
+            .select('id, username, avatar_url, display_name')
             .in('id', missingIds)
 
         if (data) {

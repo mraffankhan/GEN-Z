@@ -1,7 +1,7 @@
 import React, { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AvatarRenderer from '../../components/Avatar/AvatarRenderer'
-import CosmeticName from '../../components/Text/CosmeticName'
+
 
 const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
     // Fallback profile if missing from cache
@@ -9,10 +9,6 @@ const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
         username: 'Loading...',
         avatar_url: null,
         display_name: 'Loading...',
-        active_badge: null,
-        active_border: null,
-        cosmetics: {},
-
     }
 
     return (
@@ -29,10 +25,7 @@ const MessageBubble = memo(({ message, isMe, profile, onProfileClick }) => {
                 <div className="flex flex-col min-w-0">
                     {/* Sender Name */}
                     <div className={`text-[11px] font-semibold mb-1 px-1 truncate ${isMe ? 'text-right text-gray-500' : 'text-left text-gray-600'}`}>
-                        <CosmeticName
-                            name={displayProfile.display_name || displayProfile.username || 'User'}
-                            cosmetics={displayProfile.cosmetics || {}}
-                        />
+                        {displayProfile.display_name || displayProfile.username || 'User'}
                     </div>
 
                     {/* Bubble */}
