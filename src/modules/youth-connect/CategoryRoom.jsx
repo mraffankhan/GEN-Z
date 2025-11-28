@@ -169,34 +169,34 @@ const CategoryRoom = () => {
     const userProfile = profiles[user?.id] || user?.user_metadata || {}
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-[#F7F8FA] text-text-primary">
+        <div className="fixed inset-0 z-50 flex flex-col h-full w-full bg-white text-black">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm z-20">
+            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm z-20">
                 <div className="flex items-center gap-3">
                     <button onClick={() => navigate('/youth-connect')} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
-                        <ArrowLeft className="w-6 h-6 text-text-primary" />
+                        <ArrowLeft className="w-6 h-6 text-black" />
                     </button>
                     <div>
-                        <h2 className="font-bold text-lg text-text-primary leading-tight">{categoryName}</h2>
-                        <div className="flex items-center gap-1.5 text-xs text-green-500 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <h2 className="font-bold text-lg text-black leading-tight">{categoryName}</h2>
+                        <div className="flex items-center gap-1.5 text-xs text-neon-green font-medium">
+                            <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
                             <span>Online</span>
                         </div>
                     </div>
                 </div>
                 <button onClick={() => navigate(`/youth-connect/info/${categoryId}`)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
-                    <Info className="w-6 h-6 text-text-secondary" />
+                    <Info className="w-6 h-6 text-gray-500" />
                 </button>
             </div>
 
             {/* Messages Area (Virtualized) */}
             <div
-                className="flex-1 bg-[#EFE7DD] bg-opacity-30"
+                className="flex-1 bg-[#F8F8FA]"
                 style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/subtle-white-feathers.png")' }}
             >
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
                     </div>
                 ) : (
                     <Virtuoso
@@ -221,13 +221,13 @@ const CategoryRoom = () => {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
-                        className="flex-grow bg-[#F1F3F5] text-text-primary px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-400 text-base"
+                        className="flex-grow bg-[#F8F8FA] text-black px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all placeholder-gray-400 text-base border border-gray-100"
                         autoFocus
                     />
                     <button
                         type="submit"
                         disabled={!newMessage.trim()}
-                        className="p-3 bg-primary rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover shadow-md shadow-primary/20 transition-all active:scale-95 flex-shrink-0"
+                        className="p-3 bg-neon-green rounded-xl text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-400 shadow-md shadow-green-200 transition-all active:scale-95 flex-shrink-0"
                     >
                         <Send className="w-5 h-5" />
                     </button>

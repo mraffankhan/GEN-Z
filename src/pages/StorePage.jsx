@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 import StoreCard from '../components/StoreCard'
+import ConfirmationModal from '../components/ui/ConfirmationModal'
 import { Coins, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../context/UserContext'
@@ -9,59 +10,143 @@ import { useUser } from '../context/UserContext'
 const StorePage = () => {
     const { user, profile, refreshProfile } = useUser()
     const [items, setItems] = useState([])
+    const [ownedItems, setOwnedItems] = useState([])
+    const [activeTab, setActiveTab] = useState('store')
     const [loading, setLoading] = useState(true)
 
-
+    const [modalOpen, setModalOpen] = useState(false)
+    const [selectedItem, setSelectedItem] = useState(null)
 
     useEffect(() => {
-        fetchData()
-    }, [])
+        if (user) {
+            fetchData()
+        }
+    }, [user])
 
     const fetchData = async () => {
-        const { data: storeItems } = await supabase.from('cosmetics_store').select('*')
-        if (storeItems) setItems(storeItems)
-        setLoading(false)
+        setLoading(true)
+        try {
+            // Fetch store items
+            const { data: storeItems, error: storeError } = await supabase
+                .from('cosmetics_items')
+                .select('*')
+                .order('price', { ascending: true })
+
+            if (storeError) throw storeError
+
+            // Fetch owned items
+            const { data: owned, error: ownedError } = await supabase
+                .from('owned_cosmetics')
+                .select('item_id')
+                .eq('user_id', user.id)
+
+            if (ownedError) throw ownedError
+
+            setItems(storeItems || [])
+            setOwnedItems(owned?.map(o => o.item_id) || [])
+        } catch (error) {
+            console.error('Error fetching store data:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
-    const handleBuy = async (item) => {
+    const handleBuyClick = (item) => {
         if (!profile || !user) return
         if (profile.coins < item.price) {
             alert("Not enough coins!")
             return
         }
+        setSelectedItem(item)
+        setModalOpen(true)
+    }
 
-        const confirmBuy = window.confirm(`Buy ${item.name} for ${item.price} coins?`)
-        if (!confirmBuy) return
+    const confirmPurchase = async () => {
+        if (!selectedItem) return
+        setModalOpen(false) // Close modal immediately
 
-        const newCoins = profile.coins - item.price
+        try {
+            // 2. Deduct Coins
+            const newCoins = profile.coins - selectedItem.price
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ coins: newCoins })
+                .eq('id', user.id)
 
-        // Ensure cosmetics is an array
-        const currentCosmetics = Array.isArray(profile.cosmetics) ? profile.cosmetics : []
-        const newCosmetics = [...currentCosmetics, item]
+            if (updateError) throw new Error("Failed to deduct coins")
 
-        // Optimistic update (Context will refresh anyway)
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                coins: newCoins,
-                cosmetics: newCosmetics
-            })
-            .eq('id', user.id)
+            // 3. Add to Inventory
+            const { error: insertError } = await supabase
+                .from('owned_cosmetics')
+                .insert({
+                    user_id: user.id,
+                    item_id: selectedItem.id
+                })
 
-        if (error) {
+            if (insertError) {
+                // ROLLBACK: Refund coins if insert fails
+                await supabase
+                    .from('profiles')
+                    .update({ coins: profile.coins }) // Restore original coins
+                    .eq('id', user.id)
+                throw new Error("Failed to add item to inventory. Coins refunded.")
+            }
+
+            // 4. Success
+            alert(`Successfully purchased ${selectedItem.name}!`)
+            refreshProfile() // Update global context (coins)
+            fetchData() // Refresh owned items list
+        } catch (error) {
             console.error("Purchase failed:", error)
-            alert("Purchase failed. Please try again.")
-        } else {
-            alert(`Successfully purchased ${item.name}!`)
-            refreshProfile() // Update global context
+            alert(error.message || "Purchase failed. Please try again.")
+        } finally {
+            setSelectedItem(null)
+        }
+    }
+
+    const handleApply = async (item) => {
+        if (!user) return
+
+        try {
+            const updates = {}
+            // Store IDs for strict database linking
+            if (item.type === 'border') updates.active_border = item.id
+            if (item.type === 'badge') updates.active_badge = item.id
+
+            // For complex types (glow, animation), we might need to update the JSON
+            // But for now, let's assume we store the ID in the JSON or specific columns if they existed
+            // The prompt asks to update profiles.cosmetics (JSON) fields
+            if (item.type === 'glow') {
+                const currentCosmetics = profile.cosmetics || {}
+                updates.cosmetics = {
+                    ...currentCosmetics,
+                    active_glow_id: item.id, // Store ID
+                    glow_color: item.color // Fallback/Cache for easier rendering if needed, but we should rely on ID
+                }
+            }
+
+            // Add other types as needed
+
+            const { error } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', user.id)
+
+            if (error) throw error
+
+            alert(`Applied ${item.name}!`)
+            refreshProfile()
+        } catch (error) {
+            console.error("Failed to apply item:", error)
+            alert("Failed to apply item.")
         }
     }
 
     if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading Store...</div>
 
-
-
-    const ownedItemIds = Array.isArray(profile?.cosmetics) ? profile.cosmetics.map(c => c.id) : []
+    const filteredItems = activeTab === 'store'
+        ? items
+        : items.filter(item => ownedItems.includes(item.id))
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
@@ -78,26 +163,62 @@ const StorePage = () => {
                     </div>
                 </div>
 
-                {/* Store Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                    {items.map(item => (
-                        <StoreCard
-                            key={item.id}
-                            item={item}
-                            userCoins={profile?.coins || 0}
-                            onBuy={handleBuy}
-                            isOwned={ownedItemIds.includes(item.id)}
-                        />
-                    ))}
+                {/* Tabs */}
+                <div className="flex p-1 bg-white rounded-xl mb-6 shadow-sm border border-gray-100">
+                    <button
+                        onClick={() => setActiveTab('store')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'store' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                    >
+                        Store
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('inventory')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'inventory' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                    >
+                        My Items
+                    </button>
                 </div>
 
-                {items.length === 0 && (
+                {/* Store Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                    {filteredItems.map(item => {
+                        const isOwned = ownedItems.includes(item.id)
+                        const isActive =
+                            (item.type === 'border' && profile?.active_border === item.color) ||
+                            (item.type === 'badge' && profile?.active_badge === item.icon) ||
+                            (item.type === 'glow' && profile?.active_name_glow === item.color)
+
+                        return (
+                            <StoreCard
+                                key={item.id}
+                                item={item}
+                                userCoins={profile?.coins || 0}
+                                onBuy={handleBuyClick}
+                                onApply={handleApply}
+                                isOwned={isOwned}
+                                isActive={isActive}
+                            />
+                        )
+                    })}
+                </div>
+
+                {filteredItems.length === 0 && (
                     <div className="text-center text-gray-400 mt-10">
-                        <p>Store is empty. Run the migration script!</p>
+                        <p>{activeTab === 'store' ? "Store is empty." : "You don't own any items yet."}</p>
                     </div>
                 )}
             </div>
 
+            <ConfirmationModal
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                onConfirm={confirmPurchase}
+                title="Confirm Purchase"
+                message={`Are you sure you want to buy ${selectedItem?.name} for ${selectedItem?.price} coins?`}
+                confirmText="Buy Now"
+            />
         </div>
     )
 }

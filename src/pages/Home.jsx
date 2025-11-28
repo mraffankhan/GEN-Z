@@ -1,168 +1,148 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  Briefcase,
   Users,
   MessageSquare,
+  Briefcase,
   Code,
   PenTool,
   Gamepad2,
   Megaphone,
   ArrowRight,
-  MapPin,
-  DollarSign,
-  Loader2
+  Zap,
+  Loader2,
+  Sparkles
 } from 'lucide-react'
 import { useUser } from '../context/UserContext'
 import { supabase } from '../lib/supabase'
 import AvatarRenderer from '../components/Avatar/AvatarRenderer'
-import BaseCard from '../components/BaseCard'
+import CosmeticName from '../components/Text/CosmeticName'
 
 const Home = () => {
   const { profile, loading: userLoading } = useUser()
   const navigate = useNavigate()
-  const [jobs, setJobs] = useState([])
-  const [loadingJobs, setLoadingJobs] = useState(true)
+  const [ads, setAds] = useState([])
+  const [loadingAds, setLoadingAds] = useState(true)
 
   useEffect(() => {
-    const fetchRecommendedJobs = async () => {
+    const fetchAds = async () => {
       const { data } = await supabase
-        .from('jobs')
+        .from('ads')
         .select('*')
+        .eq('active', true)
         .order('created_at', { ascending: false })
-        .limit(4)
 
-      if (data) setJobs(data)
-      setLoadingJobs(false)
+      if (data) setAds(data)
+      setLoadingAds(false)
     }
 
-    fetchRecommendedJobs()
+    fetchAds()
   }, [])
 
   if (userLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
       </div>
     )
   }
 
-  const firstName = profile?.display_name?.split(' ')[0] || profile?.username || 'Student'
-
-  const trendingCategories = [
-    { id: 'tech-talk', name: 'Developer', icon: Code, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'creative-corner', name: 'UI/UX', icon: PenTool, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { id: 'gaming-zone', name: 'Gaming', icon: Gamepad2, color: 'text-green-600', bg: 'bg-green-50' },
-    { id: 'content-creators', name: 'Marketing', icon: Megaphone, color: 'text-pink-600', bg: 'bg-pink-50' },
-  ]
-
   return (
-    <div className="min-h-screen bg-white text-[#111111] pb-24">
-      {/* Header */}
-      <div className="px-6 py-8 flex justify-between items-center">
+    <div className="min-h-screen bg-white text-black pb-24 overflow-x-hidden">
+      {/* 1. Header & Branding */}
+      <div className="px-6 pt-10 pb-6 flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-[#111111] tracking-tight">
-            Good morning,<br />
-            <span className="text-gray-500">{firstName}</span>
+          <h1 className="text-3xl font-cyber font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-blue-600 tracking-tighter drop-shadow-sm">
+            GEN-Z CONNECT
           </h1>
+          <p className="text-gray-500 text-xs font-medium tracking-wide mt-1">
+            Your Space. Your People. Your Vibe.
+          </p>
         </div>
-        <Link to="/profile">
-          <AvatarRenderer
-            profile={profile}
-            size="lg"
-          />
+        <Link to="/profile" className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-neon-purple to-blue-500 rounded-full opacity-20 group-hover:opacity-50 blur transition duration-200"></div>
+          <div className="relative">
+            <AvatarRenderer
+              profile={profile}
+              size="md"
+            />
+          </div>
         </Link>
       </div>
 
       <div className="px-4 space-y-8">
-        {/* Main Shortcuts */}
-        <div className="grid grid-cols-3 gap-3">
-          <Link to="/opportunities" className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-50 hover:scale-[1.02] transition-transform active:scale-95">
-            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-2">
-              <Briefcase className="w-6 h-6 text-blue-600" />
+        {/* 2. Quick Access Row */}
+        <div className="grid grid-cols-3 gap-4">
+          <Link to="/youth-connect" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-neon-purple/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
+            <div className="absolute inset-0 bg-neon-purple/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex flex-col items-center justify-center relative z-10">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-neon-purple/30 shadow-sm">
+                <Users className="w-6 h-6 text-neon-purple" />
+              </div>
+              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Connect</span>
             </div>
-            <span className="text-xs font-bold text-gray-700">Jobs</span>
           </Link>
 
-          <Link to="/youth-connect" className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-50 hover:scale-[1.02] transition-transform active:scale-95">
-            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center mb-2">
-              <Users className="w-6 h-6 text-purple-600" />
+          <Link to="/dms" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-blue-500/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
+            <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex flex-col items-center justify-center relative z-10">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-blue-500/30 shadow-sm">
+                <MessageSquare className="w-6 h-6 text-blue-500" />
+              </div>
+              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Chats</span>
             </div>
-            <span className="text-xs font-bold text-gray-700">Connect</span>
           </Link>
 
-          <Link to="/dms" className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-50 hover:scale-[1.02] transition-transform active:scale-95">
-            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-2">
-              <MessageSquare className="w-6 h-6 text-green-600" />
+          <Link to="/opportunities" className="group relative p-4 bg-[#F8F8FA] rounded-2xl border border-[#E6E6E8] hover:border-neon-green/50 transition-all duration-300 active:scale-95 overflow-hidden shadow-sm hover:shadow-md">
+            <div className="absolute inset-0 bg-neon-green/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex flex-col items-center justify-center relative z-10">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-100 group-hover:border-neon-green/30 shadow-sm">
+                <Briefcase className="w-6 h-6 text-neon-green" />
+              </div>
+              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider group-hover:text-black">Gigs</span>
             </div>
-            <span className="text-xs font-bold text-gray-700">Messages</span>
           </Link>
         </div>
 
-        {/* Recommended Opportunities */}
+        {/* 3. Gen-Z Ads Section (Replaces Trending) */}
         <div>
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-lg font-bold text-[#111111]">Recommended for you</h2>
-            <Link to="/opportunities" className="text-xs font-bold text-blue-600 flex items-center gap-1">
-              View All <ArrowRight className="w-3 h-3" />
-            </Link>
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <Zap className="w-4 h-4 text-neon-purple fill-current" />
+            <h2 className="text-lg font-bold text-black tracking-tight">Gen-Z Ads</h2>
           </div>
 
-          <div className="space-y-3">
-            {loadingJobs ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-24 bg-gray-50 rounded-xl animate-pulse" />
-                ))}
-              </div>
-            ) : jobs.length > 0 ? (
-              jobs.map(job => (
-                <Link key={job.id} to={`/opportunities/${job.id}`}>
-                  <div className="p-4 bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center justify-between group hover:border-blue-100 transition-colors">
-                    <div>
-                      <h3 className="font-bold text-[#111111] mb-1 group-hover:text-blue-600 transition-colors">{job.title}</h3>
-                      <p className="text-xs text-gray-500 mb-2">{job.company}</p>
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {job.location}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="w-3 h-3" />
-                          {job.stipend || 'Unpaid'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                    </div>
+          <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 scrollbar-hide snap-x">
+            {loadingAds ? (
+              [1, 2].map(i => (
+                <div key={i} className="snap-center flex-shrink-0 w-64 h-32 bg-gray-50 rounded-2xl animate-pulse border border-gray-100" />
+              ))
+            ) : ads.length > 0 ? (
+              ads.map(ad => (
+                <a
+                  key={ad.id}
+                  href={ad.redirect_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="snap-center flex-shrink-0 w-64 h-32 relative rounded-2xl overflow-hidden group border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                    <span className="text-white font-bold text-sm">{ad.title}</span>
                   </div>
-                </Link>
+                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] font-bold text-black border border-gray-100">
+                    AD
+                  </div>
+                </a>
               ))
             ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <p className="text-sm text-gray-500">No opportunities found right now.</p>
+              <div className="w-full text-center py-8 bg-[#F8F8FA] rounded-2xl border border-dashed border-gray-200">
+                <p className="text-sm text-gray-400">No active promotions</p>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Trending Communities */}
-        <div>
-          <h2 className="text-lg font-bold text-[#111111] mb-4 px-1">Trending Communities</h2>
-          <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
-            {trendingCategories.map(cat => (
-              <Link
-                key={cat.id}
-                to={`/youth-connect/room/${cat.id}`}
-                className="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-white rounded-full shadow-sm border border-gray-100 hover:border-gray-200 transition-colors"
-              >
-                <div className={`w-8 h-8 rounded-full ${cat.bg} flex items-center justify-center`}>
-                  <cat.icon className={`w-4 h-4 ${cat.color}`} />
-                </div>
-                <span className="text-sm font-bold text-gray-700 whitespace-nowrap">{cat.name}</span>
-              </Link>
-            ))}
           </div>
         </div>
       </div>

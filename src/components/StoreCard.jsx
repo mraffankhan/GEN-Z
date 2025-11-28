@@ -2,7 +2,7 @@ import React from 'react'
 import { ShoppingBag, Lock } from 'lucide-react'
 import * as Icons from 'lucide-react'
 
-const StoreCard = ({ item, userCoins, onBuy, isOwned }) => {
+const StoreCard = ({ item, userCoins, onBuy, onApply, isOwned, isActive }) => {
     const IconComponent = Icons[item.icon] || Icons.Star
     const canAfford = userCoins >= item.price
 
@@ -15,9 +15,16 @@ const StoreCard = ({ item, userCoins, onBuy, isOwned }) => {
             <h3 className="font-bold text-gray-900 text-sm mb-1">{item.name}</h3>
             <p className="text-xs text-gray-500 capitalize mb-3">{item.type}</p>
 
-            {isOwned ? (
-                <button disabled className="w-full py-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold cursor-not-allowed">
-                    Owned
+            {isActive ? (
+                <button disabled className="w-full py-2 rounded-xl bg-neon-purple text-white text-xs font-bold cursor-default">
+                    Active
+                </button>
+            ) : isOwned ? (
+                <button
+                    onClick={() => onApply(item)}
+                    className="w-full py-2 rounded-xl bg-gray-100 text-gray-900 hover:bg-gray-200 text-xs font-bold transition-colors"
+                >
+                    Apply
                 </button>
             ) : (
                 <button

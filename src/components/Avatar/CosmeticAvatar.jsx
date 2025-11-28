@@ -2,6 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import * as Icons from 'lucide-react'
 import { ShieldCheck } from 'lucide-react'
+import { useCosmetics } from '../../context/CosmeticsContext'
 
 const CosmeticAvatar = ({
     src,
@@ -14,6 +15,7 @@ const CosmeticAvatar = ({
     className = '',
     onClick
 }) => {
+    const { resolveBorder, resolveBadge, getCosmetic } = useCosmetics()
 
     // Size mapping
     const sizeClasses = {
@@ -37,21 +39,12 @@ const CosmeticAvatar = ({
     const currentSize = sizeClasses[size] || sizeClasses.md
     const currentIconSize = iconSizes[size] || iconSizes.md
 
-    // 1. Border Logic
-    const getBorderClass = (borderName) => {
-        if (borderName === 'Gold Profile Border') return 'border-2 md:border-4 border-yellow-400 shadow-md'
-        if (borderName === 'Neon Purple Border') return 'border-2 md:border-4 border-purple-500 shadow-md'
-        if (cosmetics.gradient_border) return 'border-2 md:border-4 border-transparent bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-border'
-        return 'border border-gray-200'
-    }
+    // 1. Resolve Border
+    const borderClass = resolveBorder(activeBorder)
 
-    // 2. Badge Logic
-    const getBadgeIcon = (badgeName) => {
-        if (badgeName === 'OG Badge') return Icons.Crown
-        if (badgeName === 'Cyber Spark Badge') return Icons.Zap
-        return null
-    }
-    const BadgeIcon = activeBadge ? getBadgeIcon(activeBadge) : null
+    // 2. Resolve Badge
+    const badgeIconName = resolveBadge(activeBadge)
+    const BadgeIcon = badgeIconName ? (Icons[badgeIconName] || Icons.Star) : null
 
     // 3. Animation Variants
     const animations = {
@@ -62,8 +55,21 @@ const CosmeticAvatar = ({
     }
 
     // 4. Glow / Aura Styles
-    const glowStyle = cosmetics.glow_color ? {
-        boxShadow: `0 0 10px ${cosmetics.glow_color}, 0 0 20px ${cosmetics.glow_color}40`
+    // Resolve glow from ID if present, otherwise fallback to color
+    const glowId = cosmetics.active_glow_id
+    const resolvedGlow = glowId ? resolveBorder(glowId) : cosmetics.glow_color // Re-using resolveBorder as it returns color class or style? Wait, resolveBorder returns CLASS. Glow needs COLOR.
+
+    // We need a helper for color resolution if we store IDs.
+    // Let's assume resolveBorder returns a class, but for glow we need a color value for box-shadow.
+    // We might need to extend CosmeticsContext to return the raw item.
+
+    // Let's use getCosmetic from context
+    // Let's use getCosmetic from context (already destructured above)
+    const glowItem = glowId ? getCosmetic(glowId) : null
+    const glowColor = glowItem ? glowItem.color : cosmetics.glow_color
+
+    const glowStyle = glowColor ? {
+        boxShadow: `0 0 10px ${glowColor}, 0 0 20px ${glowColor}40`
     } : {}
 
     const auraStyle = cosmetics.aura_style ? {
@@ -83,7 +89,7 @@ const CosmeticAvatar = ({
 
             {/* Avatar Container */}
             <motion.div
-                className={`relative rounded-full overflow-hidden ${currentSize} ${getBorderClass(activeBorder)}`}
+                className={`relative rounded-full overflow-hidden ${currentSize} ${borderClass}`}
                 style={{ ...glowStyle, ...auraStyle }}
                 animate={animations[cosmetics.animation_type] || animations.none}
                 whileHover={onClick ? { scale: 1.05 } : {}}
