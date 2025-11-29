@@ -76,16 +76,24 @@ const OpportunitiesFeed = () => {
     const executeDelete = async () => {
         if (!jobToDelete) return
 
+        console.log("Deleting job id:", jobToDelete.id)
         setIsDeleting(true)
+
         try {
+            // 1. Delete from Supabase
             const { error } = await supabase
                 .from('jobs')
                 .delete()
                 .eq('id', jobToDelete.id)
 
-            if (error) throw error
+            if (error) {
+                console.error("Supabase delete error:", error)
+                throw error
+            }
 
-            // Update UI immediately
+            console.log("Job deleted successfully from DB")
+
+            // 2. Update UI immediately
             setJobs(prev => prev.filter(j => j.id !== jobToDelete.id))
             setToast({ type: 'success', message: 'Job deleted successfully' })
             setDeleteModalOpen(false)
@@ -176,8 +184,8 @@ const OpportunitiesFeed = () => {
             {toast && (
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border ${toast.type === 'success'
-                            ? 'bg-white text-green-700 border-green-100'
-                            : 'bg-white text-red-700 border-red-100'
+                        ? 'bg-white text-green-700 border-green-100'
+                        : 'bg-white text-red-700 border-red-100'
                         }`}>
                         {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                         <span className="text-sm font-medium">{toast.message}</span>
