@@ -10,12 +10,17 @@ import DetailsCard from '../components/profile/DetailsCard'
 import ActionRow from '../components/profile/ActionRow'
 import EditProfileModal from '../components/profile/EditProfileModal'
 import MoreMenu from '../components/profile/MoreMenu'
+import AddJob from '../components/admin/AddJob'
+import ManageJobs from '../components/admin/ManageJobs'
+import { ShieldCheck, Plus, List } from 'lucide-react'
 
 const Profile = () => {
     const { user, profile, loading, refreshProfile } = useUser()
     const navigate = useNavigate()
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [activeAdminTab, setActiveAdminTab] = useState(null)
+    const [jobToEdit, setJobToEdit] = useState(null)
 
     const handleLogout = async () => {
         try {
@@ -69,6 +74,57 @@ const Profile = () => {
                         isMe={true}
                         onEdit={() => setIsEditModalOpen(true)}
                     />
+
+                    {/* Admin Panel */}
+                    {profile?.is_admin && (
+                        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <ShieldCheck className="w-5 h-5 text-neon-purple" />
+                                <h2 className="text-lg font-bold text-gray-900">Admin Panel</h2>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setActiveAdminTab('add'); setJobToEdit(null); }}
+                                    className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${activeAdminTab === 'add' ? 'bg-black text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Post Job
+                                </button>
+                                <button
+                                    onClick={() => setActiveAdminTab('manage')}
+                                    className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${activeAdminTab === 'manage' ? 'bg-black text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                >
+                                    <List className="w-4 h-4" />
+                                    Manage Jobs
+                                </button>
+                            </div>
+
+                            {activeAdminTab === 'add' && (
+                                <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <AddJob
+                                        onClose={() => setActiveAdminTab(null)}
+                                        jobToEdit={jobToEdit}
+                                        onJobAdded={() => {
+                                            setActiveAdminTab('manage')
+                                            setJobToEdit(null)
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {activeAdminTab === 'manage' && (
+                                <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <ManageJobs
+                                        onEdit={(job) => {
+                                            setJobToEdit(job)
+                                            setActiveAdminTab('add')
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* 3. Details Card (About + Interests) */}
