@@ -6,6 +6,8 @@ import { useUser } from '../context/UserContext'
 
 // Shared Components
 import JobCard from '../components/jobs/JobCard'
+import ExternalLink from '../components/common/ExternalLink'
+import SearchBar from '../components/jobs/SearchBar'
 
 // Categories Data (No Emojis)
 const categories = [
@@ -25,6 +27,7 @@ const Home = () => {
   const [ads, setAds] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,12 +69,6 @@ const Home = () => {
     }, 5000)
     return () => clearInterval(interval)
   }, [ads])
-
-  const handleAdClick = (ad) => {
-    if (ad.redirect_url) {
-      window.open(ad.redirect_url, '_blank')
-    }
-  }
 
   // Skeleton for Job Card
   const JobSkeleton = () => (
@@ -130,14 +127,12 @@ const Home = () => {
         {/* 3. Hero Banner Carousel - Matches Job Card Style */}
         {ads.length > 0 && (
           <div className="mb-8">
-            <div
-              className="relative w-full aspect-[2/1] rounded-[20px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-gray-100 group cursor-pointer bg-white"
-              onClick={() => handleAdClick(ads[currentAdIndex])}
-            >
+            <div className="relative w-full aspect-[2/1] rounded-[20px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-gray-100 group bg-white">
               {ads.map((ad, index) => (
-                <div
+                <ExternalLink
                   key={ad.id}
-                  className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${index === currentAdIndex ? 'opacity-100' : 'opacity-0'}`}
+                  href={ad.redirect_url}
+                  className={`absolute inset-0 transition-opacity duration-700 ease-in-out block ${index === currentAdIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
                   <img
                     src={ad.image_url}
@@ -154,11 +149,11 @@ const Home = () => {
                       </span>
                     </div>
                   </div>
-                </div>
+                </ExternalLink>
               ))}
 
-              {/* Dots */}
-              <div className="absolute bottom-4 right-4 flex gap-1.5">
+              {/* Dots - z-index raised to be above the links */}
+              <div className="absolute bottom-4 right-4 flex gap-1.5 z-20 pointer-events-none">
                 {ads.map((_, idx) => (
                   <div
                     key={idx}

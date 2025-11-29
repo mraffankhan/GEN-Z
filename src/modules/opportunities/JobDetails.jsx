@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, DollarSign, Clock, Building, Share2, ExternalLink, Briefcase } from 'lucide-react'
+import { ArrowLeft, MapPin, DollarSign, Clock, Building, Share2, Briefcase, ExternalLink as ExternalLinkIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import BaseButton from '../../components/BaseButton'
 import BaseCard from '../../components/BaseCard'
+import ExternalLink from '../../components/common/ExternalLink'
 
 const JobDetails = () => {
     const { jobId } = useParams()
@@ -112,15 +112,13 @@ const JobDetails = () => {
             {/* Sticky Apply Button - FIXED for mobile */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-xl border-t border-gray-100 z-[999] safe-bottom">
                 <div className="max-w-2xl mx-auto">
-                    <a
+                    <ExternalLink
                         href={job.apply_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className="w-full flex items-center justify-center gap-2 bg-black text-white font-bold py-4 rounded-[18px] hover:bg-gray-900 transition-all active:scale-[0.98] shadow-lg shadow-black/10"
                     >
                         <span>Apply Now</span>
-                        <ExternalLink className="w-4 h-4" />
-                    </a>
+                        <ExternalLinkIcon className="w-4 h-4" />
+                    </ExternalLink>
                 </div>
             </div>
         </div>
