@@ -1,25 +1,21 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Code, PenTool, Video, Palette, TrendingUp, Briefcase, Music, Gamepad2 } from 'lucide-react'
+import { Users, Briefcase, Zap, ArrowRight, Sparkles } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../context/UserContext'
 
-// Components
-import HomeHeader from '../components/home/HomeHeader'
-import OpportunityCard from '../components/home/OpportunityCard'
-import ConnectCard from '../components/home/ConnectCard'
-import AdBanner from '../components/home/AdBanner'
+// Shared Components
+import JobCard from '../components/jobs/JobCard'
+import SearchBar from '../components/jobs/SearchBar'
 
-// Categories Data (Cleaned up colors for minimal look - passing accentColor class instead)
+// Categories Data (No Emojis)
 const categories = [
-  { id: 'developer', name: 'Developer', icon: Code, accentColor: 'bg-blue-500' },
-  { id: 'ui-ux', name: 'UI/UX', icon: PenTool, accentColor: 'bg-purple-500' },
-  { id: 'video-editor', name: 'Editor', icon: Video, accentColor: 'bg-red-500' },
-  { id: 'graphic-designer', name: 'Designer', icon: Palette, accentColor: 'bg-pink-500' },
-  { id: 'marketing', name: 'Marketing', icon: TrendingUp, accentColor: 'bg-green-500' },
-  { id: 'business', name: 'Business', icon: Briefcase, accentColor: 'bg-indigo-500' },
-  { id: 'music-art', name: 'Art', icon: Music, accentColor: 'bg-cyan-500' },
-  { id: 'gaming', name: 'Gaming', icon: Gamepad2, accentColor: 'bg-orange-500' },
+  { id: 'developer', name: 'Developers' },
+  { id: 'ui-ux', name: 'UI/UX Design' },
+  { id: 'marketing', name: 'Marketing' },
+  { id: 'video-editor', name: 'Video Editing' },
+  { id: 'business', name: 'Business' },
+  { id: 'content', name: 'Content Creation' },
 ]
 
 const Home = () => {
@@ -29,17 +25,19 @@ const Home = () => {
   const [jobs, setJobs] = useState([])
   const [ads, setAds] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currentAdIndex, setCurrentAdIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        // 1. Fetch Jobs (Limit 3)
+        // 1. Fetch Jobs (Limit 5)
         const { data: jobsData } = await supabase
           .from('jobs')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(3)
+          .limit(5)
 
         if (jobsData) setJobs(jobsData)
 
@@ -62,10 +60,25 @@ const Home = () => {
     fetchData()
   }, [user])
 
-  // Skeletons
-  const OpportunitySkeleton = () => (
-    <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] w-full border border-transparent">
-      <div className="flex justify-between items-start mb-2">
+  // Auto-rotate ads
+  useEffect(() => {
+    if (ads.length <= 1) return
+    const interval = setInterval(() => {
+      setCurrentAdIndex(prev => (prev + 1) % ads.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [ads])
+
+  const handleAdClick = (ad) => {
+    if (ad.redirect_url) {
+      window.open(ad.redirect_url, '_blank')
+    }
+  }
+
+  // Skeleton for Job Card
+  const JobSkeleton = () => (
+    <div className="bg-white rounded-[20px] p-5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-gray-100 w-full">
+      <div className="flex justify-between items-start mb-3">
         <div className="flex-1 pr-4 space-y-2">
           <div className="h-5 bg-gray-100 rounded w-3/4 animate-pulse" />
           <div className="h-3 bg-gray-50 rounded w-1/2 animate-pulse" />
@@ -79,93 +92,145 @@ const Home = () => {
     </div>
   )
 
-  const ConnectSkeleton = () => (
-    <div className="w-28 h-32 flex-shrink-0 bg-white rounded-[24px] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center gap-3 animate-pulse border border-transparent">
-      <div className="w-8 h-8 bg-gray-50 rounded-full" />
-      <div className="w-16 h-3 bg-gray-50 rounded" />
-    </div>
-  )
-
-  const AdSkeleton = () => (
-    <div className="w-full aspect-video bg-gray-100 rounded-[24px] animate-pulse" />
-  )
-
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-28">
-      {/* Max Width Container for Desktop */}
-      <div className="max-w-[600px] mx-auto bg-[#FAFAFA] min-h-screen">
 
-        {/* 1. Header */}
-        <HomeHeader />
-
-        <div className="flex flex-col gap-8 px-4 pt-2">
-
-          {/* 2. Opportunities Section */}
-          <section>
-            <div className="flex items-center justify-between mb-4 px-1">
-              <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Opportunities For You</h2>
-            </div>
-            <div className="flex flex-col gap-4">
-              {loading ? (
-                <>
-                  <OpportunitySkeleton />
-                  <OpportunitySkeleton />
-                </>
-              ) : jobs.length > 0 ? (
-                jobs.map(job => (
-                  <OpportunityCard
-                    key={job.id}
-                    job={job}
-                    onClick={() => navigate(`/opportunities/${job.id}`)}
-                  />
-                ))
-              ) : (
-                <div className="p-8 text-center bg-white rounded-[24px] shadow-sm border border-transparent">
-                  <p className="text-sm text-gray-400 font-medium">No active opportunities</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* 3. Youth Connect Section */}
-          <section>
-            <div className="flex items-center justify-between mb-4 px-1">
-              <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Youth Connect</h2>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide snap-x">
-              {loading ? (
-                <>
-                  <ConnectSkeleton />
-                  <ConnectSkeleton />
-                  <ConnectSkeleton />
-                  <ConnectSkeleton />
-                </>
-              ) : (
-                categories.map(cat => (
-                  <ConnectCard
-                    key={cat.id}
-                    category={cat}
-                    onClick={() => navigate(`/youth-connect/room/${cat.id}`)}
-                  />
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* 4. Ads Section */}
-          <section>
-            <div className="flex flex-col gap-6">
-              {loading ? (
-                <AdSkeleton />
-              ) : ads.length > 0 ? (
-                ads.map(ad => (
-                  <AdBanner key={ad.id} ad={ad} />
-                ))
-              ) : null}
-            </div>
-          </section>
-
+      {/* 1. Header & Search (Sticky) - Matches Opportunities Page */}
+      <div className="sticky top-0 z-40 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-gray-200/50">
+        <div className="max-w-[600px] mx-auto px-4 pt-4 pb-4">
+          <div className="text-center mb-4">
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">GEN-Z CONNECT</h1>
+          </div>
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
         </div>
+      </div>
+
+      <div className="max-w-[600px] mx-auto px-4 pt-4">
+
+        {/* 2. Quick Action Buttons - Matches FilterBar Button Style */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 mb-4">
+          <button
+            onClick={() => navigate('/youth-connect')}
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Youth Connect
+          </button>
+          <button
+            onClick={() => navigate('/opportunities')}
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            Opportunities
+          </button>
+          <button
+            onClick={() => navigate('/youth-connect')}
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Communities
+          </button>
+        </div>
+
+        {/* 3. Hero Banner Carousel - Matches Job Card Style */}
+        {ads.length > 0 && (
+          <div className="mb-8">
+            <div
+              className="relative w-full aspect-[2/1] rounded-[20px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-gray-100 group cursor-pointer bg-white"
+              onClick={() => handleAdClick(ads[currentAdIndex])}
+            >
+              {ads.map((ad, index) => (
+                <div
+                  key={ad.id}
+                  className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${index === currentAdIndex ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <h3 className="text-white font-bold text-lg leading-tight mb-1">{ad.title}</h3>
+                    <div className="flex items-center gap-1.5 text-white/90 text-xs font-medium">
+                      <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">Sponsored</span>
+                      <span className="flex items-center gap-0.5">
+                        View <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Dots */}
+              <div className="absolute bottom-4 right-4 flex gap-1.5">
+                {ads.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`h-1.5 rounded-full transition-all ${idx === currentAdIndex ? 'bg-white w-4' : 'bg-white/40 w-1.5'}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Latest Opportunities - Matches Opportunities Page Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Latest Opportunities</h2>
+            <button
+              onClick={() => navigate('/opportunities')}
+              className="text-[13px] font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              View All
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {loading ? (
+              <>
+                <JobSkeleton />
+                <JobSkeleton />
+                <JobSkeleton />
+              </>
+            ) : jobs.length > 0 ? (
+              jobs.map(job => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  currentUser={user}
+                  onDelete={() => { }} // No-op for Home page
+                  onClick={() => navigate(`/opportunities/${job.id}`)}
+                />
+              ))
+            ) : (
+              <div className="text-center py-10 bg-white rounded-[20px] border border-gray-100 shadow-sm">
+                <p className="text-gray-400 font-medium text-sm">No opportunities found</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 5. Youth Connect Preview - Matches Filter Pill Style */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">Active Rooms</h2>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4 snap-x">
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => navigate(`/youth-connect/room/${cat.id}`)}
+                className="flex-shrink-0 px-5 py-2.5 bg-white rounded-full text-[13px] font-medium text-gray-600 whitespace-nowrap border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all active:scale-95 snap-start shadow-sm"
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   )

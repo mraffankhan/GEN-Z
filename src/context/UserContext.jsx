@@ -78,10 +78,16 @@ export const UserProvider = ({ children }) => {
     }, [])
 
     const logout = async () => {
-        await supabase.auth.signOut()
-        setSession(null)
-        setUser(null)
-        setProfile(null)
+        try {
+            await supabase.auth.signOut()
+        } catch (error) {
+            console.error('Logout error:', error)
+        } finally {
+            setSession(null)
+            setUser(null)
+            setProfile(null)
+            localStorage.clear() // Optional: Clear any other local storage
+        }
     }
 
     const value = {

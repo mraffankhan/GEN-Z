@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, CheckCircle } from 'lucide-react'
 import { useUser } from '../context/UserContext'
 import { supabase } from '../lib/supabase'
 
@@ -12,22 +12,40 @@ import EditProfileModal from '../components/profile/EditProfileModal'
 import MoreMenu from '../components/profile/MoreMenu'
 import AddJob from '../components/admin/AddJob'
 import ManageJobs from '../components/admin/ManageJobs'
+import LogoutModal from '../components/ui/LogoutModal'
 import { ShieldCheck, Plus, List } from 'lucide-react'
 
 const Profile = () => {
-    const { user, profile, loading, refreshProfile } = useUser()
+    const { user, profile, loading, refreshProfile, logout } = useUser()
     const navigate = useNavigate()
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [activeAdminTab, setActiveAdminTab] = useState(null)
     const [jobToEdit, setJobToEdit] = useState(null)
 
-    const handleLogout = async () => {
+    // Logout State
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+    const [toast, setToast] = useState(null)
+
+    const handleLogoutClick = () => {
+        setIsLogoutModalOpen(true)
+    }
+
+    const confirmLogout = async () => {
         try {
-            await supabase.auth.signOut()
-            navigate('/login')
+            // Use context logout to ensure local state is cleared
+            await logout()
         } catch (error) {
             console.error('Error logging out:', error)
+        } finally {
+            // Always perform client-side cleanup
+            setToast({ type: 'success', message: 'Logged out successfully' })
+            setIsLogoutModalOpen(false)
+
+            // Short delay to show toast before redirecting
+            setTimeout(() => {
+                navigate('/auth/login', { replace: true })
+            }, 1000)
         }
     }
 
@@ -48,7 +66,16 @@ const Profile = () => {
     if (!profile) return <div className="min-h-screen bg-white flex items-center justify-center">Profile not found</div>
 
     return (
-        <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-24">
+        <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-24 relative">
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border bg-white text-green-700 border-green-100">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="text-sm font-medium">{toast.message}</span>
+                    </div>
+                </div>
+            )}
 
             {/* 1. Ultra-minimal Top Bar */}
             <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-md px-4 py-3 flex justify-between items-center">
@@ -144,8 +171,15 @@ const Profile = () => {
                     onClose={() => setIsMenuOpen(false)}
                     isMe={true}
                     onEdit={() => setIsEditModalOpen(true)}
-                    onLogout={handleLogout}
+                    onLogout={handleLogoutClick}
                     onShare={handleShare}
+                />
+
+                {/* Logout Modal */}
+                <LogoutModal
+                    isOpen={isLogoutModalOpen}
+                    onClose={() => setIsLogoutModalOpen(false)}
+                    onConfirm={confirmLogout}
                 />
 
             </div>
