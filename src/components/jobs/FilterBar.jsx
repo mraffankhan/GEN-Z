@@ -1,82 +1,133 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ChevronDown, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
-const FilterBar = ({ filters, activeFilters, onFilterChange }) => {
-    const [openDropdown, setOpenDropdown] = useState(null)
+const FilterDropdown = ({ label, options, activeValue, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false)
+    const buttonRef = useRef(null)
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 200 })
 
-    const toggleDropdown = (id) => {
-        setOpenDropdown(prev => prev === id ? null : id)
-    }
+    // Update position when opening
+    useEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect()
+            setDropdownPos({
+                top: rect.bottom + 8,
+                left: rect.left,
+                width: Math.max(rect.width, 200) // Min width 200px
+            })
+        }
+    }, [isOpen])
+
+    // Close when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (buttonRef.current && !buttonRef.current.contains(event.target)) {
+                // Check if click is inside the portal dropdown
+                const dropdown = document.getElementById(`dropdown-${label}`)
+                if (dropdown && !dropdown.contains(event.target)) {
+                    setIsOpen(false)
+                }
+            }
+        }
+
+        // Handle scroll to close/update (optional, but closing is safer for fixed pos)
+        const handleScroll = () => setIsOpen(false)
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            window.addEventListener('scroll', handleScroll, true)
+            window.addEventListener('resize', handleScroll)
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            window.removeEventListener('scroll', handleScroll, true)
+            window.removeEventListener('resize', handleScroll)
+        }
+    }, [isOpen, label])
 
     return (
-        <div className="sticky top-[72px] z-30 bg-[#FAFAFA]/95 backdrop-blur-sm py-2 -mx-4 px-4 border-b border-gray-100/50">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {filters.map(filter => {
-                    const isActive = activeFilters[filter.id] && activeFilters[filter.id] !== 'All'
+        <>
+            <button
+                ref={buttonRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`
+                    flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border
+                    ${activeValue && activeValue !== 'All'
+                        ? 'bg-black text-white border-black shadow-md'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
+                `}
+            >
+                {activeValue && activeValue !== 'All' ? activeValue : label}
+                <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-                    return (
-                        <div key={filter.id} className="relative flex-shrink-0">
-                            <button
-                                onClick={() => toggleDropdown(filter.id)}
-                                className={`
-                                    flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border
-                                    ${isActive
-                                        ? 'bg-white text-gray-900 border-neon-purple shadow-sm ring-1 ring-neon-purple/20'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
-                                `}
-                            >
-                                {isActive ? activeFilters[filter.id] : filter.label}
-                                <ChevronDown className={`w-3 h-3 transition-transform ${openDropdown === filter.id ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {/* Dropdown Menu */}
-                            {openDropdown === filter.id && (
-                                <>
-                                    <div
-                                        className="fixed inset-0 z-10"
-                                        onClick={() => setOpenDropdown(null)}
-                                    ></div>
-                                    <div className="absolute top-full mt-2 left-0 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20 animate-in fade-in zoom-in-95 duration-200">
-                                        <button
-                                            onClick={() => {
-                                                onFilterChange(filter.id, 'All')
-                                                setOpenDropdown(null)
-                                            }}
-                                            className={`w-full text-left px-4 py-2 text-[13px] hover:bg-gray-50 transition-colors ${!isActive ? 'font-semibold text-neon-purple' : 'text-gray-600'}`}
-                                        >
-                                            All {filter.label}s
-                                        </button>
-                                        {filter.options.map(option => (
-                                            <button
-                                                key={option}
-                                                onClick={() => {
-                                                    onFilterChange(filter.id, option)
-                                                    setOpenDropdown(null)
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-[13px] hover:bg-gray-50 transition-colors ${activeFilters[filter.id] === option ? 'font-semibold text-neon-purple bg-purple-50/50' : 'text-gray-600'}`}
-                                            >
-                                                {option}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )
-                })}
-
-                {/* Clear Filters Button */}
-                {Object.values(activeFilters).some(v => v !== 'All') && (
+            {isOpen && createPortal(
+                <div
+                    id={`dropdown-${label}`}
+                    className="fixed bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-[9999] overflow-y-auto"
+                    style={{
+                        top: dropdownPos.top,
+                        left: dropdownPos.left,
+                        minWidth: '200px',
+                        maxHeight: '300px'
+                    }}
+                >
                     <button
                         onClick={() => {
-                            Object.keys(activeFilters).forEach(key => onFilterChange(key, 'All'))
+                            onSelect('All')
+                            setIsOpen(false)
                         }}
-                        className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors flex-shrink-0 ml-auto"
+                        className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-gray-50 transition-colors ${!activeValue || activeValue === 'All' ? 'font-semibold text-neon-purple' : 'text-gray-600'}`}
                     >
-                        <X className="w-3.5 h-3.5" />
+                        All {label}s
                     </button>
-                )}
-            </div>
+                    {options.map(option => (
+                        <button
+                            key={option}
+                            onClick={() => {
+                                onSelect(option)
+                                setIsOpen(false)
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-gray-50 transition-colors ${activeValue === option ? 'font-semibold text-neon-purple bg-purple-50/50' : 'text-gray-600'}`}
+                        >
+                            {option}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </>
+    )
+}
+
+const FilterBar = ({ filters, activeFilters, onFilterChange, onClearAll }) => {
+    const hasActiveFilters = Object.values(activeFilters).some(val => val !== 'All')
+
+    if (!filters || filters.length === 0) return null
+
+    return (
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-2 w-full px-1 relative">
+            {filters.map(filter => (
+                <FilterDropdown
+                    key={filter.id}
+                    label={filter.label}
+                    options={filter.options}
+                    activeValue={activeFilters[filter.id]}
+                    onSelect={(value) => onFilterChange(filter.id, value)}
+                />
+            ))}
+
+            {hasActiveFilters && (
+                <button
+                    onClick={onClearAll}
+                    className="flex-shrink-0 flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-50 rounded-full transition-colors whitespace-nowrap ml-auto"
+                >
+                    <X className="w-3 h-3" />
+                    Clear
+                </button>
+            )}
         </div>
     )
 }
