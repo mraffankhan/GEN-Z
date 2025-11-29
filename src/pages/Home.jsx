@@ -6,7 +6,6 @@ import { useUser } from '../context/UserContext'
 
 // Shared Components
 import JobCard from '../components/jobs/JobCard'
-import SearchBar from '../components/jobs/SearchBar'
 
 // Categories Data (No Emojis)
 const categories = [
@@ -26,18 +25,17 @@ const Home = () => {
   const [ads, setAds] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
-  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        // 1. Fetch Jobs (Limit 5)
+        // 1. Fetch Jobs (Limit 4)
         const { data: jobsData } = await supabase
           .from('jobs')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(4)
 
         if (jobsData) setJobs(jobsData)
 
@@ -95,37 +93,34 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-gray-900 pb-28">
 
-      {/* 1. Header & Search (Sticky) - Matches Opportunities Page */}
+      {/* 1. Header (Sticky) - Clean, Centered, Separator */}
       <div className="sticky top-0 z-40 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-gray-200/50">
-        <div className="max-w-[600px] mx-auto px-4 pt-4 pb-4">
-          <div className="text-center mb-4">
-            <h1 className="text-xl font-bold tracking-tight text-gray-900">GEN-Z CONNECT</h1>
-          </div>
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+        <div className="max-w-[600px] mx-auto px-4 py-4">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 text-center">GenZ Connect</h1>
         </div>
       </div>
 
-      <div className="max-w-[600px] mx-auto px-4 pt-4">
+      <div className="max-w-[600px] mx-auto px-4 pt-6">
 
         {/* 2. Quick Action Buttons - Matches FilterBar Button Style */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 mb-4">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 mb-6">
           <button
             onClick={() => navigate('/youth-connect')}
-            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95 shadow-sm"
           >
             <Users className="w-3.5 h-3.5" />
             Youth Connect
           </button>
           <button
             onClick={() => navigate('/opportunities')}
-            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95 shadow-sm"
           >
             <Briefcase className="w-3.5 h-3.5" />
             Opportunities
           </button>
           <button
             onClick={() => navigate('/youth-connect')}
-            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-medium transition-all whitespace-nowrap border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-95 shadow-sm"
           >
             <Sparkles className="w-3.5 h-3.5" />
             Communities
